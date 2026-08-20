@@ -21,5 +21,6 @@ typedef struct {
 void packet_init(pad_state_t pads[PAD_COUNT]);
 void packet_neutral(pad_state_t pads[PAD_COUNT]);
 bool packet_push(uint8_t byte, pad_state_t pads[PAD_COUNT]);
+uint8_t packet_flags(void);
 
 #endif

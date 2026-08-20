@@ -30,7 +30,7 @@ a browser is enough.
 | Role                       | Where                      | What it does                                       |
 | -------------------------- | -------------------------- | -------------------------------------------------- |
 | **Media**                  | Capture machine            | FFmpeg encodes, MediaMTX serves WebRTC             |
-| **Node** (`apps/node`)     | Same machine (Pico on USB) | HTTP, 4 sockets, serial to the Pico, WHEP proxy    |
+| **Node** (`apps/node`)     | Same machine (Pico on USB) | HTTP, 4 Pico pads, serial to the Pico, WHEP proxy  |
 | **Client** (`apps/client`) | Browser                    | Connects to the node, shows the feed, sends inputs |
 
 ```
@@ -40,7 +40,7 @@ Browsers --WHEP/inputs--> node --USB serial--> Pico --USB--> Switch 2
 ```
 
 Video signalling (WHEP) goes through the node. The actual WebRTC media goes to `MEDIA_ICE_IP:MEDIA_ICE_PORT`. Any number
-of browsers can watch. They all open the same WebSocket. Up to four can claim a pad.
+of browsers can watch. They all open the same WebSocket. Up to four can press Play; player order is set on the console.
 
 ## Run
 
@@ -77,7 +77,7 @@ Node in Docker talks to MediaMTX on the Compose network (`media:8889`). That por
 | Port                            | Where  | What                              |
 | ------------------------------- | ------ | --------------------------------- |
 | `CLIENT_PORT` (5000)            | Client | Web UI (Slick)                    |
-| `NODE_PORT` (5050)              | Node   | HTTP: health, sockets, WHEP proxy |
+| `NODE_PORT` (5050)              | Node   | HTTP: health, WebSocket, WHEP proxy |
 | `MEDIA_ICE_PORT` (8189) UDP+TCP | Media  | WebRTC ICE / RTP                  |
 
 WHEP (`8889`) and RTSP (`8554`) stay inside the media container.
@@ -103,11 +103,11 @@ On the LAN set `NODE_BASE_URL=http://192.168.1.20:5050` and `MEDIA_ICE_IP=192.16
 
 | Route               | What                                                   |
 | ------------------- | ------------------------------------------------------ |
-| `GET /health`       | Connect-page check: capture, Pico, sockets             |
-| `GET /socket`       | WebSocket: status, ping, claim or watch a pad          |
+| `GET /health`       | Connect-page check: capture, Pico, playing             |
+| `GET /socket`       | WebSocket: play, watch, pad; status                    |
 | `POST /switch/whep` | WHEP offer; `PATCH` / `DELETE` `/switch/whep/:session` |
 
-Video is public. Everyone on the play page stays on the WebSocket. A claimed pad is held until Watch or disconnect.
+Video is public. Everyone on the play page stays on the WebSocket. **Play** takes a remote pad (max 4); **Watch** releases it. The Switch assigns player numbers. Local controllers use leftover slots.
 
 ## Layout
 
@@ -115,7 +115,7 @@ Video is public. Everyone on the play page stays on the WebSocket. A claimed pad
 s2pipe/
 ├── apps/node/          # Deno: HTTP, sockets, Pico, WHEP proxy
 ├── apps/client/        # Slick + Preact: connect the node, play HUD, inputs
-├── firmware/           # Pico: UART from the node, 4 USB pads to the Switch
+├── firmware/           # Pico: UART from the node, USB pads to the Switch when someone plays
 ├── shared/             # Pad and node types
 ├── docker/             # Node, media, and client images
 ├── docker-compose.yml

@@ -7,11 +7,11 @@ Node --UART 921600--> Pico GP5 RX / GP4 TX
 Switch dock USB  --> Pico USB
 ```
 
-The s2pipe packet (`apps/node/src/utils/packet.ts`) is one 64-byte frame with **all four pads**. The node writes that frame on a single serial port. This firmware parses it and exposes **four HID gamepads** on that one Pico.
+The s2pipe packet (`apps/node/src/utils/packet.ts`) is one 64-byte frame with four pad slots. Byte 3 (`flags`) is a bitmask of occupied Pico pads (`bit0` = slot 0). The firmware only enumerates that many HID interfaces. Zero occupied pads: USB detach, so a local controller can take a Switch slot.
 
 Do not flash [switch-pico](https://github.com/jyapayne/switch-pico) `.uf2` here. Their UART frames start with `0xAA` and carry **one** Pro Controller (plus optional IMU). Four players there means four `--map` serial ports, four Picos. Wiring is the same (UART1, GPIO4/5, 921600, 3.3 V); the packet is not.
 
-USB identity is the HORI Pokken HID layout (VID `0x0F0D`, PID `0x0092`), four IN interrupt endpoints, same composite pattern as PicoSwitch-WirelessGamepadAdapter. Enable **Pro Controller Wired Communication** on the console. switch-pico’s Nintendo handshake (`0x057E` / `0x2009`) is a later firmware step if the Switch 2 rejects HORI.
+USB identity is the HORI Pokken HID layout (VID `0x0F0D`, PID `0x0092`). Joining or leaving a remote pad re-enumerates USB (short drop of every Pico pad). Player order is set on the console. Enable **Pro Controller Wired Communication**. switch-pico’s Nintendo handshake (`0x057E` / `0x2009`) is a later firmware step if the Switch 2 rejects HORI.
 
 ## Wire
 

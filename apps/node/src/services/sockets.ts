@@ -1,46 +1,48 @@
-import { type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
-import type { SocketStatus } from "@s2pipe/shared/types/node";
+import { PAD_COUNT } from "@s2pipe/shared/types/pad";
 
-const owners = new Map<SocketId, WebSocket>();
+const seats: (WebSocket | null)[] = Array.from({ length: PAD_COUNT }, () => null);
 const viewers = new Set<WebSocket>();
 
-export function socketStatus(): SocketStatus[] {
-	return SOCKETS.map((socket) => ({
-		socket,
-		occupied: owners.has(socket),
-	}));
+export function playingCount(): number {
+	let n = 0;
+	for (const seat of seats) if (seat !== null) n++;
+	return n;
+}
+
+export function padMask(): number {
+	let flags = 0;
+	for (let i = 0; i < PAD_COUNT; i++) {
+		if (seats[i] !== null) flags |= 1 << i;
+	}
+	return flags;
 }
 
 export function addViewer(ws: WebSocket): void {
 	viewers.add(ws);
 }
 
-export function padOf(ws: WebSocket): SocketId | undefined {
-	for (const [id, owner] of owners) {
-		if (owner === ws) return id;
-	}
+export function padOf(ws: WebSocket): number | undefined {
+	const i = seats.indexOf(ws);
+	return i < 0 ? undefined : i;
 }
 
-export function claimPad(
-	ws: WebSocket,
-	id: SocketId,
-): { ok: true; released: SocketId | undefined } | { ok: false } {
-	const owner = owners.get(id);
-	if (owner !== undefined && owner !== ws) return { ok: false };
-
+export function playPad(ws: WebSocket): number | undefined {
 	const current = padOf(ws);
-	if (current !== undefined && current !== id) owners.delete(current);
-	owners.set(id, ws);
-	return { ok: true, released: current !== id ? current : undefined };
+	if (current !== undefined) return current;
+	const i = seats.indexOf(null);
+	if (i < 0) return undefined;
+	seats[i] = ws;
+	return i;
 }
 
-export function watchPad(ws: WebSocket): SocketId | undefined {
-	const id = padOf(ws);
-	if (id !== undefined) owners.delete(id);
-	return id;
+export function watchPad(ws: WebSocket): number | undefined {
+	const i = padOf(ws);
+	if (i === undefined) return undefined;
+	seats[i] = null;
+	return i;
 }
 
-export function dropViewer(ws: WebSocket): SocketId | undefined {
+export function dropViewer(ws: WebSocket): number | undefined {
 	viewers.delete(ws);
 	return watchPad(ws);
 }

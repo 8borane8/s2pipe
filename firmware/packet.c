@@ -18,6 +18,8 @@ static uint16_t crc16_ccitt(uint8_t const *data, uint8_t n) {
 	return crc;
 }
 
+static uint8_t flags;
+
 static void neutral(pad_state_t *pad) {
 	pad->buttons = 0;
 	pad->lx = PAD_CENTER;
@@ -34,6 +36,7 @@ void packet_neutral(pad_state_t pads[PAD_COUNT]) {
 
 void packet_init(pad_state_t pads[PAD_COUNT]) {
 	len = 0;
+	flags = 0;
 	packet_neutral(pads);
 }
 
@@ -43,6 +46,8 @@ static bool parse_frame(uint8_t const *frame, pad_state_t pads[PAD_COUNT]) {
 
 	uint16_t got = (uint16_t)frame[36] | ((uint16_t)frame[37] << 8);
 	if (got != crc16_ccitt(frame, 36)) return false;
+
+	flags = frame[3] & 0x0f;
 
 	uint8_t const *p = frame + 4;
 	for (uint8_t i = 0; i < PAD_COUNT; i++) {
@@ -83,4 +88,8 @@ bool packet_push(uint8_t byte, pad_state_t pads[PAD_COUNT]) {
 		len--;
 	}
 	return false;
+}
+
+uint8_t packet_flags(void) {
+	return flags;
 }

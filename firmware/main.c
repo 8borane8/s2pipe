@@ -11,6 +11,7 @@
 #endif
 
 #include "packet.h"
+#include "usb.h"
 
 #define UART_ID uart1
 #define UART_IRQ UART1_IRQ
@@ -36,6 +37,7 @@ typedef struct TU_ATTR_PACKED {
 
 static pad_state_t pads[PAD_COUNT];
 static uint32_t last_packet_ms;
+static uint8_t live_count;
 
 static uint8_t rx_buf[256];
 static volatile uint8_t rx_head;
@@ -77,12 +79,39 @@ static void on_uart_rx(void) {
 	}
 }
 
+static uint8_t popcount4(uint8_t value) {
+	value &= 0x0f;
+	return (uint8_t)((value & 1) + ((value >> 1) & 1) + ((value >> 2) & 1) + ((value >> 3) & 1));
+}
+
+static uint8_t slot_of_hid(uint8_t hid) {
+	uint8_t n = 0;
+	uint8_t flags = packet_flags();
+	for (uint8_t slot = 0; slot < PAD_COUNT; slot++) {
+		if (!(flags & (1u << slot))) continue;
+		if (n == hid) return slot;
+		n++;
+	}
+	return 0xff;
+}
+
+static void apply_pad_count(uint8_t flags) {
+	uint8_t n = popcount4(flags);
+	if (n == live_count) return;
+	live_count = n;
+	usb_set_hid_count(n);
+	tud_disconnect();
+	sleep_ms(80);
+	if (n) tud_connect();
+}
+
 static void uart_drain(void) {
 	while (rx_tail != rx_head) {
 		uint8_t byte = rx_buf[rx_tail];
 		rx_tail = (uint8_t)(rx_tail + 1);
 		if (!packet_push(byte, pads)) continue;
 		last_packet_ms = to_ms_since_boot(get_absolute_time());
+		apply_pad_count(packet_flags());
 #ifdef PICO_DEFAULT_LED_PIN
 		gpio_xor_mask(1u << PICO_DEFAULT_LED_PIN);
 #endif
@@ -96,10 +125,13 @@ static void uart_drain(void) {
 
 static void hid_push(void) {
 	if (!tud_mounted()) return;
-	for (uint8_t i = 0; i < PAD_COUNT; i++) {
+	uint8_t n = usb_hid_count();
+	for (uint8_t i = 0; i < n; i++) {
 		if (!tud_hid_n_ready(i)) continue;
+		uint8_t slot = slot_of_hid(i);
+		if (slot >= PAD_COUNT) continue;
 		hid_report_t report;
-		fill_report(&pads[i], &report);
+		fill_report(&pads[slot], &report);
 		tud_hid_n_report(i, 0, &report, sizeof(report));
 	}
 }
@@ -113,9 +145,11 @@ uint16_t tud_hid_get_report_cb(
 ) {
 	(void)report_id;
 	(void)report_type;
-	if (instance >= PAD_COUNT || reqlen < sizeof(hid_report_t)) return 0;
+	if (instance >= usb_hid_count() || reqlen < sizeof(hid_report_t)) return 0;
+	uint8_t slot = slot_of_hid(instance);
+	if (slot >= PAD_COUNT) return 0;
 	hid_report_t report;
-	fill_report(&pads[instance], &report);
+	fill_report(&pads[slot], &report);
 	memcpy(buffer, &report, sizeof(report));
 	return sizeof(report);
 }
@@ -155,6 +189,8 @@ int main(void) {
 	uart_set_irq_enables(UART_ID, true, false);
 
 	tusb_init();
+	usb_set_hid_count(0);
+	tud_disconnect();
 
 	while (1) {
 		tud_task();

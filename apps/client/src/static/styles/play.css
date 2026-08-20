@@ -95,17 +95,42 @@
 	flex: 1;
 }
 
+.play-bottom {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	justify-content: center;
+	align-items: center;
+	gap: var(--space-2);
+
+	position: relative;
+}
+
 .play-tools {
 	justify-content: flex-end;
+
+	position: absolute;
+	right: 0;
+	bottom: 0;
 }
 
 .play-slots,
 .play-status,
-.play-tools,
 .play-slot,
 .play-controller,
+.play-tools,
 .play-hud .btn {
 	pointer-events: auto;
+}
+
+.play-count {
+	color: var(--text);
+	font-size: var(--text-sm);
+	font-weight: 600;
+
+	flex: 0 0 auto;
+
+	opacity: 0.7;
 }
 
 .play-slot,
@@ -148,24 +173,20 @@
 	border-color: var(--accent);
 }
 
-.play-slot[data-state="taken"] {
+.play-slot:disabled {
 	opacity: 0.35;
 	cursor: not-allowed;
 }
 
 .play-controller {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-
-	transform: translate(-50%, -50%);
+	min-width: 0;
 }
 
 .play-controller > select {
 	all: revert;
 	box-sizing: border-box;
-	min-width: min(22rem, calc(100vw - 2rem));
-	max-width: min(32rem, calc(100vw - 2rem));
+	min-width: min(18rem, calc(100vw - 10rem));
+	max-width: min(28rem, calc(100vw - 10rem));
 	height: 2.5rem;
 
 	color: var(--text);
@@ -437,6 +458,22 @@
 		justify-content: center;
 	}
 
+	.play-bottom {
+		flex-direction: column-reverse;
+		align-items: stretch;
+	}
+
+	.play-controller > select {
+		width: 100%;
+		min-width: 0;
+		max-width: none;
+	}
+
+	.play-tools {
+		position: static;
+		align-self: flex-end;
+	}
+
 	.play-tools > .btn-icon {
 		width: 2.5rem;
 		height: 2.5rem;
@@ -459,12 +496,12 @@
 	}
 
 	.play-stats {
-		bottom: 4.75rem;
+		bottom: 7.5rem;
 		left: var(--space-3);
 	}
 
 	.play-toasts {
-		bottom: 4.75rem;
+		bottom: 7.5rem;
 		padding: 0 var(--space-3);
 	}
 

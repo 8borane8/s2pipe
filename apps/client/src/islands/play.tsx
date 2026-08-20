@@ -1,9 +1,9 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { Eye, Maximize, Minimize, Settings, Volume2, VolumeX, X } from "lucide-preact";
+import { Eye, Gamepad2, Maximize, Minimize, Settings, Volume2, VolumeX, X } from "lucide-preact";
 
-import type { CaptureStatus, ClientMessage, PicoStatus, ServerMessage, SocketStatus } from "@s2pipe/shared/types/node";
-import { type PadState, samePad, type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
+import type { CaptureStatus, ClientMessage, PicoStatus, ServerMessage } from "@s2pipe/shared/types/node";
+import { PAD_COUNT, type PadState, samePad } from "@s2pipe/shared/types/pad";
 
 import {
 	createInputTracker,
@@ -20,8 +20,6 @@ type Props = {
 };
 
 type Toast = { id: number; text: string };
-
-const emptySockets: SocketStatus[] = SOCKETS.map((socket) => ({ socket, occupied: false }));
 
 function wsUrl(nodeUrl: string): string {
 	const url = new URL(nodeUrl);
@@ -44,12 +42,13 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const statsPrev = useRef<{ bytes: number; at: number } | null>(null);
 	const idleTimer = useRef<ReturnType<typeof setTimeout> | 0>(0);
 	const toastSeq = useRef(0);
+	const playRequested = useRef(false);
 
-	const claimed = useSignal<SocketId | null>(null);
-	const sockets = useSignal<SocketStatus[]>(emptySockets);
+	const playing = useSignal(false);
+	const playingCount = useSignal(0);
+	const connected = useSignal(false);
 	const capture = useSignal<CaptureStatus | null>(null);
 	const pico = useSignal<PicoStatus | null>(null);
-	const pingMs = useSignal<number | null>(null);
 	const pads = useSignal<GamepadOption[]>([]);
 	const source = useSignal<InputSource>({ kind: "keyboard" });
 	const settings = useSignal(false);
@@ -64,7 +63,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const toasts = useSignal<Toast[]>([]);
 	const locked = useSignal(false);
 
-	const claimedId = claimed.value;
 	const padList = pads.value;
 	const inputSource = source.value;
 
@@ -115,26 +113,29 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		let socket: WebSocket | null = null;
 		let retry = 0;
 
-		const ping = globalThis.setInterval(() => {
-			send(wsRef.current, { type: "ping", t: Date.now() });
-		}, 1000);
-
 		function connect(): void {
 			const next = new WebSocket(wsUrl(nodeUrl));
 			socket = next;
 			wsRef.current = next;
 
+			next.addEventListener("open", () => {
+				if (wsRef.current === next) connected.value = true;
+			});
+
 			next.addEventListener("message", (event) => {
 				if (typeof event.data !== "string") return;
 				try {
 					const msg = JSON.parse(event.data) as ServerMessage;
-					if (msg.type === "hello") claimed.value = msg.socket;
-					else if (msg.type === "status") {
-						capture.value = msg.capture;
-						pico.value = msg.pico;
-						sockets.value = msg.sockets;
-					} else if (msg.type === "pong") pingMs.value = Math.max(0, Date.now() - msg.t);
-					else if (msg.type === "error") toast("That pad is already taken.");
+					if (msg.op === "play") {
+						if (!playRequested.current) return;
+						playRequested.current = false;
+						playing.value = msg.data.playing;
+						if (!msg.data.playing) toast("All remote pads are taken.");
+					} else if (msg.op === "status") {
+						capture.value = msg.data.capture;
+						pico.value = msg.data.pico;
+						playingCount.value = msg.data.playing;
+					}
 				} catch {
 					// ignore
 				}
@@ -142,8 +143,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 			next.addEventListener("close", () => {
 				if (wsRef.current === next) wsRef.current = null;
-				claimed.value = null;
-				pingMs.value = null;
+				playRequested.current = false;
+				playing.value = false;
+				connected.value = false;
 				if (!dropped) retry = globalThis.setTimeout(connect, 1500);
 			});
 		}
@@ -152,7 +154,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 		return () => {
 			dropped = true;
-			clearInterval(ping);
 			clearTimeout(retry);
 			wsRef.current = null;
 			socket?.close();
@@ -186,7 +187,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}, []);
 
 	useEffect(() => {
-		if (claimedId === null) return;
+		if (!playing.value) return;
 		let frame = 0;
 		let last: PadState | null = null;
 		const loop = () => {
@@ -197,11 +198,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			const state = tracker.sample(source.value);
 			if (last !== null && samePad(last, state)) return;
 			last = state;
-			send(ws, { type: "pad", state });
+			send(ws, { op: "pad", data: state });
 		};
 		frame = requestAnimationFrame(loop);
 		return () => cancelAnimationFrame(frame);
-	}, [claimedId]);
+	}, [playing.value]);
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
@@ -253,18 +254,18 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		};
 	}, []);
 
-	function claim(id: SocketId): void {
-		const slot = sockets.value.find((item) => item.socket === id);
-		if (slot?.occupied && claimed.value !== id) {
-			toast("That pad is already taken.");
-			return;
-		}
-		send(wsRef.current, { type: "claim", socket: id });
+	function play(): void {
+		if (playing.value) return;
+		if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+		playRequested.current = true;
+		send(wsRef.current, { op: "play" });
 		bumpHud();
 	}
 
 	function watch(): void {
-		send(wsRef.current, { type: "watch" });
+		playRequested.current = false;
+		playing.value = false;
+		send(wsRef.current, { op: "watch" });
 		if (document.pointerLockElement) document.exitPointerLock();
 		bumpHud();
 	}
@@ -272,7 +273,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	function onStageClick(): void {
 		bumpHud();
 		void videoRef.current?.play();
-		if (claimed.value === null || settings.value) return;
+		if (!playing.value || settings.value) return;
 		videoRef.current?.requestPointerLock().catch(() => {});
 	}
 
@@ -287,6 +288,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}
 
 	const hideHud = locked.value || (idle.value && live.value && !settings.value);
+	const padsFull = playingCount.value >= PAD_COUNT && !playing.value;
 
 	return (
 		<section
@@ -335,26 +337,21 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						<span>s2</span>pipe
 					</span>
 					<div class="play-slots">
-						{SOCKETS.map((id) => {
-							const slot = sockets.value.find((item) => item.socket === id);
-							const mine = claimedId === id;
-							const taken = Boolean(slot?.occupied) && !mine;
-							return (
-								<button
-									type="button"
-									class="play-slot"
-									data-state={mine ? "you" : taken ? "taken" : "free"}
-									disabled={taken}
-									onClick={() => claim(id)}
-								>
-									P{id}
-								</button>
-							);
-						})}
+						<span class="play-count">{playingCount.value}/{PAD_COUNT} playing</span>
 						<button
 							type="button"
 							class="play-slot"
-							data-state={claimedId === null ? "you" : "free"}
+							data-state={playing.value ? "you" : "free"}
+							disabled={padsFull}
+							onClick={play}
+						>
+							<Gamepad2 size={14} aria-hidden="true" />
+							Play
+						</button>
+						<button
+							type="button"
+							class="play-slot"
+							data-state={!playing.value ? "you" : "free"}
 							onClick={watch}
 						>
 							<Eye size={14} aria-hidden="true" />
@@ -368,49 +365,52 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						<span class="pill" data-ok={pico.value?.connected ? "true" : "false"}>
 							Pico {pico.value?.connected ? "ready" : "off"}
 						</span>
-						<span class="pill">{pingMs.value === null ? "Connecting" : `${pingMs.value} ms`}</span>
+						<span class="pill" data-ok={connected.value ? "true" : "false"}>
+							{connected.value ? "Connected" : "Connecting"}
+						</span>
 					</div>
 				</div>
 
-				<label class="play-controller">
-					<select
-						aria-label="Controller"
-						value={inputSource.kind === "keyboard" ? "keyboard" : String(inputSource.index)}
-						onChange={onSourceChange}
-					>
-						<option value="keyboard">Keyboard & mouse</option>
-						{padList.map((pad) => <option value={String(pad.index)}>{pad.id}</option>)}
-					</select>
-				</label>
-
-				<div class="play-tools">
-					<button
-						type="button"
-						class="btn btn-icon"
-						aria-label={muted.value ? "Unmute" : "Mute"}
-						onClick={() => muted.value = !muted.value}
-					>
-						{muted.value ? <VolumeX size={16} /> : <Volume2 size={16} />}
-					</button>
-					<button
-						type="button"
-						class="btn btn-icon"
-						aria-label={fullscreen.value ? "Exit fullscreen" : "Fullscreen"}
-						onClick={toggleFullscreen}
-					>
-						{fullscreen.value ? <Minimize size={16} /> : <Maximize size={16} />}
-					</button>
-					<button
-						type="button"
-						class="btn btn-icon"
-						aria-label="Settings"
-						onClick={() => {
-							settings.value = !settings.value;
-							idle.value = false;
-						}}
-					>
-						<Settings size={16} />
-					</button>
+				<div class="play-bottom">
+					<label class="play-controller">
+						<select
+							aria-label="Controller"
+							value={inputSource.kind === "keyboard" ? "keyboard" : String(inputSource.index)}
+							onChange={onSourceChange}
+						>
+							<option value="keyboard">Keyboard & mouse</option>
+							{padList.map((pad) => <option value={String(pad.index)}>{pad.id}</option>)}
+						</select>
+					</label>
+					<div class="play-tools">
+						<button
+							type="button"
+							class="btn btn-icon"
+							aria-label={muted.value ? "Unmute" : "Mute"}
+							onClick={() => muted.value = !muted.value}
+						>
+							{muted.value ? <VolumeX size={16} /> : <Volume2 size={16} />}
+						</button>
+						<button
+							type="button"
+							class="btn btn-icon"
+							aria-label={fullscreen.value ? "Exit fullscreen" : "Fullscreen"}
+							onClick={toggleFullscreen}
+						>
+							{fullscreen.value ? <Minimize size={16} /> : <Maximize size={16} />}
+						</button>
+						<button
+							type="button"
+							class="btn btn-icon"
+							aria-label="Settings"
+							onClick={() => {
+								settings.value = !settings.value;
+								idle.value = false;
+							}}
+						>
+							<Settings size={16} />
+						</button>
+					</div>
 				</div>
 			</div>
 

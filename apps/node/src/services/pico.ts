@@ -1,28 +1,32 @@
 import { config } from "@/config.ts";
+import { padMask } from "@/services/sockets.ts";
 import { encodePacket } from "@/utils/packet.ts";
-import { neutralPad, type PadState, samePad, sanitizePad, type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
+import { type PadState, PAD_COUNT, samePad, sanitizePad, neutralPad } from "@s2pipe/shared/types/pad";
 import type { PicoStatus } from "@s2pipe/shared/types/node";
 
-const pads = new Map<SocketId, PadState>(SOCKETS.map((id) => [id, neutralPad()]));
+const SERIAL_BAUD = 921600;
+const FLUSH_MS = 8;
+const KEEPALIVE_TICKS = 12;
+
+const pads: PadState[] = Array.from({ length: PAD_COUNT }, () => neutralPad());
 
 let file: Deno.FsFile | null = null;
 let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
 let picoError: string | null = null;
 let dirty = false;
+let ticks = 0;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
-let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
 let retryTimer: ReturnType<typeof setInterval> | null = null;
 
-export function setPad(id: SocketId, state: PadState): void {
+export function setPad(index: number, state: PadState): void {
 	const next = sanitizePad(state);
-	const prev = pads.get(id);
-	if (prev && samePad(prev, next)) return;
-	pads.set(id, next);
+	if (samePad(pads[index]!, next)) return;
+	pads[index] = next;
 	dirty = true;
 }
 
-export function clearPad(id: SocketId): void {
-	pads.set(id, neutralPad());
+export function clearPad(index: number): void {
+	pads[index] = neutralPad();
 	dirty = true;
 }
 
@@ -38,7 +42,7 @@ async function flush(): Promise<void> {
 	if (!writer || !dirty) return;
 	dirty = false;
 	try {
-		await writer.write(encodePacket(pads));
+		await writer.write(encodePacket(pads, padMask()));
 		picoError = null;
 	} catch (error) {
 		picoError = error instanceof Error ? error.message : String(error);
@@ -61,31 +65,24 @@ async function closePico(): Promise<void> {
 	file = null;
 }
 
-function stopTimers(): void {
-	if (flushTimer !== null) {
-		clearInterval(flushTimer);
-		flushTimer = null;
-	}
-	if (keepAliveTimer !== null) {
-		clearInterval(keepAliveTimer);
-		keepAliveTimer = null;
-	}
+function stopFlush(): void {
+	if (flushTimer === null) return;
+	clearInterval(flushTimer);
+	flushTimer = null;
 }
 
-function startTimers(): void {
-	if (flushTimer === null) {
-		flushTimer = setInterval(() => {
-			flush().catch(() => {});
-		}, 8);
-	}
-	if (keepAliveTimer === null) {
-		keepAliveTimer = setInterval(() => {
+function startFlush(): void {
+	if (flushTimer !== null) return;
+	ticks = 0;
+	flushTimer = setInterval(() => {
+		ticks++;
+		if (ticks >= KEEPALIVE_TICKS) {
+			ticks = 0;
 			dirty = true;
-		}, 100);
-	}
+		}
+		flush().catch(() => {});
+	}, FLUSH_MS);
 }
-
-const SERIAL_BAUD = 921600;
 
 function windowsComPort(path: string): string | null {
 	const match = path.match(/(?:\\\\\.\\)?(COM\d+)$/i);
@@ -96,21 +93,19 @@ async function setSerialBaud(path: string): Promise<void> {
 	if (Deno.build.os === "windows") {
 		const com = windowsComPort(path);
 		if (!com) return;
-		const command = new Deno.Command("mode", {
+		await new Deno.Command("mode", {
 			args: [`${com}:`, `BAUD=${SERIAL_BAUD}`, "PARITY=N", "DATA=8", "STOP=1"],
 			stdout: "null",
 			stderr: "null",
-		});
-		await command.output();
+		}).output();
 		return;
 	}
 
-	const command = new Deno.Command("stty", {
+	await new Deno.Command("stty", {
 		args: ["-F", path, String(SERIAL_BAUD), "raw", "-echo", "cs8", "-parenb", "-cstopb"],
 		stdout: "null",
 		stderr: "null",
-	});
-	await command.output();
+	}).output();
 }
 
 async function openPico(): Promise<void> {
@@ -122,13 +117,13 @@ async function openPico(): Promise<void> {
 		writer = file.writable.getWriter();
 		picoError = null;
 		dirty = true;
-		startTimers();
+		startFlush();
 		await flush();
 	} catch (error) {
 		picoError = error instanceof Error ? error.message : String(error);
 		file = null;
 		writer = null;
-		stopTimers();
+		stopFlush();
 	}
 }
 

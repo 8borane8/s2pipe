@@ -1,4 +1,4 @@
-import type { PadState, SocketId } from "./pad.ts";
+import type { PadState } from "./pad.ts";
 
 export type CaptureStatus = {
 	running: boolean;
@@ -12,27 +12,22 @@ export type PicoStatus = {
 	error: string | null;
 };
 
-export type SocketStatus = {
-	socket: SocketId;
-	occupied: boolean;
+export type StatusData = {
+	capture: CaptureStatus;
+	pico: PicoStatus;
+	playing: number;
 };
 
 export type NodeStatus = {
 	service: "s2pipe-node";
 	uptimeSec: number;
-	capture: CaptureStatus;
-	pico: PicoStatus;
-	sockets: SocketStatus[];
-};
+} & StatusData;
 
 export type ClientMessage =
-	| { type: "pad"; state: PadState }
-	| { type: "ping"; t: number }
-	| { type: "claim"; socket: SocketId }
-	| { type: "watch" };
+	| { op: "play" }
+	| { op: "watch" }
+	| { op: "pad"; data: PadState };
 
 export type ServerMessage =
-	| { type: "hello"; socket: SocketId | null }
-	| { type: "pong"; t: number }
-	| { type: "status"; capture: CaptureStatus; pico: PicoStatus; sockets: SocketStatus[] }
-	| { type: "error"; error: "socket_taken" };
+	| { op: "status"; data: StatusData }
+	| { op: "play"; data: { playing: boolean } };

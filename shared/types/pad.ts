@@ -1,5 +1,4 @@
-export const SOCKETS = [1, 2, 3, 4] as const;
-export type SocketId = (typeof SOCKETS)[number];
+export const PAD_COUNT = 4;
 
 export const PAD_CENTER = 128;
 
@@ -31,16 +30,6 @@ export type PadState = {
 	rx: number;
 	ry: number;
 };
-
-export function isSocketId(value: unknown): value is SocketId {
-	return value === 1 || value === 2 || value === 3 || value === 4;
-}
-
-export function parseSocketId(raw: string | undefined): SocketId | undefined {
-	if (raw === undefined || raw === "") return undefined;
-	const value = Number(raw);
-	return isSocketId(value) ? value : undefined;
-}
 
 export function neutralPad(): PadState {
 	return {

@@ -38,7 +38,6 @@ services:
             - "${NODE_PORT}:${NODE_PORT}"
         environment:
             NODE_PORT: ${NODE_PORT}
-            NODE_BASE_URL: ${NODE_BASE_URL}
             MEDIA_HOST: media
             CAPTURE_SOURCE: ${CAPTURE_SOURCE}
             PICO_SERIAL: ${PICO_SERIAL}
