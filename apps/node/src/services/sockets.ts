@@ -1,8 +1,8 @@
 import { type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
 import type { SocketStatus } from "@s2pipe/shared/types/node";
 
-const pending = Symbol("pending");
-const owners = new Map<SocketId, WebSocket | typeof pending>();
+const owners = new Map<SocketId, WebSocket>();
+const viewers = new Set<WebSocket>();
 
 export function socketStatus(): SocketStatus[] {
 	return SOCKETS.map((socket) => ({
@@ -11,32 +11,42 @@ export function socketStatus(): SocketStatus[] {
 	}));
 }
 
-export function claimSocket(
-	requested?: SocketId,
-): { id: SocketId } | { error: "socket_taken" | "socket_full"; status: 409 } {
-	if (requested !== undefined) {
-		if (owners.has(requested)) return { error: "socket_taken", status: 409 };
-		owners.set(requested, pending);
-		return { id: requested };
+export function addViewer(ws: WebSocket): void {
+	viewers.add(ws);
+}
+
+export function padOf(ws: WebSocket): SocketId | undefined {
+	for (const [id, owner] of owners) {
+		if (owner === ws) return id;
 	}
-
-	const free = SOCKETS.find((socket) => !owners.has(socket));
-	if (!free) return { error: "socket_full", status: 409 };
-	owners.set(free, pending);
-	return { id: free };
 }
 
-export function occupySocket(id: SocketId, ws: WebSocket): void {
+export function claimPad(
+	ws: WebSocket,
+	id: SocketId,
+): { ok: true; released: SocketId | undefined } | { ok: false } {
+	const owner = owners.get(id);
+	if (owner !== undefined && owner !== ws) return { ok: false };
+
+	const current = padOf(ws);
+	if (current !== undefined && current !== id) owners.delete(current);
 	owners.set(id, ws);
+	return { ok: true, released: current !== id ? current : undefined };
 }
 
-export function releaseSocket(id: SocketId): void {
-	owners.delete(id);
+export function watchPad(ws: WebSocket): SocketId | undefined {
+	const id = padOf(ws);
+	if (id !== undefined) owners.delete(id);
+	return id;
 }
 
-export function forEachOpenSocket(fn: (ws: WebSocket) => void): void {
-	for (const owner of owners.values()) {
-		if (owner === pending) continue;
-		if (owner.readyState === WebSocket.OPEN) fn(owner);
+export function dropViewer(ws: WebSocket): SocketId | undefined {
+	viewers.delete(ws);
+	return watchPad(ws);
+}
+
+export function forEachViewer(fn: (ws: WebSocket) => void): void {
+	for (const viewer of viewers) {
+		if (viewer.readyState === WebSocket.OPEN) fn(viewer);
 	}
 }

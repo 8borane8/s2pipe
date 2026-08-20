@@ -3,7 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { Eye, Maximize, Minimize, Settings, Volume2, VolumeX, X } from "lucide-preact";
 
 import type { CaptureStatus, ClientMessage, PicoStatus, ServerMessage, SocketStatus } from "@s2pipe/shared/types/node";
-import { type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
+import { type PadState, samePad, type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
 
 import {
 	createInputTracker,
@@ -12,7 +12,6 @@ import {
 	KEYBOARD_HELP,
 	listGamepads,
 } from "../utils/input.ts";
-import { createClient } from "../client.ts";
 import { readStreamStats, startWhep, type StreamStats, type WhepHandle } from "../utils/whep.ts";
 
 type Props = {
@@ -24,12 +23,16 @@ type Toast = { id: number; text: string };
 
 const emptySockets: SocketStatus[] = SOCKETS.map((socket) => ({ socket, occupied: false }));
 
-function wsUrl(nodeUrl: string, socket: SocketId): string {
+function wsUrl(nodeUrl: string): string {
 	const url = new URL(nodeUrl);
 	url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
 	url.pathname = "/socket";
-	url.search = `?socket=${socket}`;
+	url.search = "";
 	return url.href;
+}
+
+function send(ws: WebSocket | null, message: ClientMessage): void {
+	if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
 }
 
 export default function Play({ nodeUrl, nodeLocked }: Props) {
@@ -108,73 +111,53 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}, [nodeUrl]);
 
 	useEffect(() => {
-		const api = createClient(nodeUrl);
-		const tick = () => {
-			api.get("/health").then((res) => {
-				if (!res.success) return;
-				capture.value = res.data.capture;
-				pico.value = res.data.pico;
-				if (claimed.value === null) sockets.value = res.data.sockets;
-			}).catch(() => {});
-		};
-		tick();
-		const timer = setInterval(tick, 1500);
-		return () => clearInterval(timer);
-	}, [nodeUrl]);
-
-	useEffect(() => {
-		if (claimedId === null) {
-			wsRef.current?.close();
-			wsRef.current = null;
-			pingMs.value = null;
-			return;
-		}
-
-		const socket = new WebSocket(wsUrl(nodeUrl, claimedId));
-		wsRef.current = socket;
-		let opened = false;
 		let dropped = false;
-
-		socket.addEventListener("open", () => {
-			opened = true;
-		});
-
-		socket.addEventListener("message", (event) => {
-			if (typeof event.data !== "string") return;
-			try {
-				const msg = JSON.parse(event.data) as ServerMessage;
-				if (msg.type === "hello") claimed.value = msg.socket;
-				else if (msg.type === "status") {
-					capture.value = msg.capture;
-					pico.value = msg.pico;
-					sockets.value = msg.sockets;
-				} else if (msg.type === "pong") pingMs.value = Math.max(0, Date.now() - msg.t);
-			} catch {
-				// ignore
-			}
-		});
-
-		socket.addEventListener("close", () => {
-			if (wsRef.current === socket) wsRef.current = null;
-			if (dropped) return;
-			if (!opened) toast("That pad is already taken.");
-			if (claimed.value === claimedId) claimed.value = null;
-			pingMs.value = null;
-		});
+		let socket: WebSocket | null = null;
+		let retry = 0;
 
 		const ping = globalThis.setInterval(() => {
-			if (socket.readyState !== WebSocket.OPEN) return;
-			const msg: ClientMessage = { type: "ping", t: Date.now() };
-			socket.send(JSON.stringify(msg));
+			send(wsRef.current, { type: "ping", t: Date.now() });
 		}, 1000);
+
+		function connect(): void {
+			const next = new WebSocket(wsUrl(nodeUrl));
+			socket = next;
+			wsRef.current = next;
+
+			next.addEventListener("message", (event) => {
+				if (typeof event.data !== "string") return;
+				try {
+					const msg = JSON.parse(event.data) as ServerMessage;
+					if (msg.type === "hello") claimed.value = msg.socket;
+					else if (msg.type === "status") {
+						capture.value = msg.capture;
+						pico.value = msg.pico;
+						sockets.value = msg.sockets;
+					} else if (msg.type === "pong") pingMs.value = Math.max(0, Date.now() - msg.t);
+					else if (msg.type === "error") toast("That pad is already taken.");
+				} catch {
+					// ignore
+				}
+			});
+
+			next.addEventListener("close", () => {
+				if (wsRef.current === next) wsRef.current = null;
+				claimed.value = null;
+				pingMs.value = null;
+				if (!dropped) retry = globalThis.setTimeout(connect, 1500);
+			});
+		}
+
+		connect();
 
 		return () => {
 			dropped = true;
 			clearInterval(ping);
-			if (wsRef.current === socket) wsRef.current = null;
-			socket.close();
+			clearTimeout(retry);
+			wsRef.current = null;
+			socket?.close();
 		};
-	}, [claimedId, nodeUrl]);
+	}, [nodeUrl]);
 
 	useEffect(() => {
 		const tracker = createInputTracker();
@@ -205,13 +188,16 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	useEffect(() => {
 		if (claimedId === null) return;
 		let frame = 0;
+		let last: PadState | null = null;
 		const loop = () => {
 			frame = requestAnimationFrame(loop);
 			const tracker = inputRef.current;
 			const ws = wsRef.current;
 			if (!tracker || !ws || ws.readyState !== WebSocket.OPEN) return;
-			const msg: ClientMessage = { type: "pad", state: tracker.sample(source.value) };
-			ws.send(JSON.stringify(msg));
+			const state = tracker.sample(source.value);
+			if (last !== null && samePad(last, state)) return;
+			last = state;
+			send(ws, { type: "pad", state });
 		};
 		frame = requestAnimationFrame(loop);
 		return () => cancelAnimationFrame(frame);
@@ -273,12 +259,12 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			toast("That pad is already taken.");
 			return;
 		}
-		claimed.value = id;
+		send(wsRef.current, { type: "claim", socket: id });
 		bumpHud();
 	}
 
 	function watch(): void {
-		claimed.value = null;
+		send(wsRef.current, { type: "watch" });
 		if (document.pointerLockElement) document.exitPointerLock();
 		bumpHud();
 	}
@@ -382,7 +368,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						<span class="pill" data-ok={pico.value?.connected ? "true" : "false"}>
 							Pico {pico.value?.connected ? "ready" : "off"}
 						</span>
-						<span class="pill">{pingMs.value === null ? "Watching" : `${pingMs.value} ms`}</span>
+						<span class="pill">{pingMs.value === null ? "Connecting" : `${pingMs.value} ms`}</span>
 					</div>
 				</div>
 

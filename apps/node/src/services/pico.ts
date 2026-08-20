@@ -1,6 +1,6 @@
 import { config } from "@/config.ts";
 import { encodePacket } from "@/utils/packet.ts";
-import { neutralPad, type PadState, sanitizePad, type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
+import { neutralPad, type PadState, samePad, sanitizePad, type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
 import type { PicoStatus } from "@s2pipe/shared/types/node";
 
 const pads = new Map<SocketId, PadState>(SOCKETS.map((id) => [id, neutralPad()]));
@@ -14,7 +14,10 @@ let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
 let retryTimer: ReturnType<typeof setInterval> | null = null;
 
 export function setPad(id: SocketId, state: PadState): void {
-	pads.set(id, sanitizePad(state));
+	const next = sanitizePad(state);
+	const prev = pads.get(id);
+	if (prev && samePad(prev, next)) return;
+	pads.set(id, next);
 	dirty = true;
 }
 

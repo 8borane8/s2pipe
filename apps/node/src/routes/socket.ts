@@ -1,8 +1,8 @@
 import { Router } from "@webtools/expressapi";
 import { captureStatus } from "@/services/capture.ts";
 import { clearPad, picoStatus, setPad } from "@/services/pico.ts";
-import { claimSocket, forEachOpenSocket, occupySocket, releaseSocket, socketStatus } from "@/services/sockets.ts";
-import { parseSocketId, type SocketId } from "@s2pipe/shared/types/pad";
+import { addViewer, claimPad, dropViewer, forEachViewer, padOf, socketStatus, watchPad } from "@/services/sockets.ts";
+import { isSocketId } from "@s2pipe/shared/types/pad";
 import type { ClientMessage, ServerMessage } from "@s2pipe/shared/types/node";
 
 function send(ws: WebSocket, message: ServerMessage): void {
@@ -20,15 +20,14 @@ async function currentStatus(): Promise<ServerMessage> {
 
 async function pushStatus(): Promise<void> {
 	const message = await currentStatus();
-	forEachOpenSocket((ws) => send(ws, message));
+	forEachViewer((ws) => send(ws, message));
 }
 
-function bind(ws: WebSocket, id: SocketId): void {
-	occupySocket(id, ws);
-	void pushStatus();
+function bind(ws: WebSocket): void {
+	addViewer(ws);
 
 	const greet = () => {
-		send(ws, { type: "hello", socket: id });
+		send(ws, { type: "hello", socket: padOf(ws) ?? null });
 		void currentStatus().then((status) => send(ws, status));
 	};
 	if (ws.readyState === WebSocket.OPEN) greet();
@@ -38,16 +37,42 @@ function bind(ws: WebSocket, id: SocketId): void {
 		if (typeof event.data !== "string") return;
 		try {
 			const msg = JSON.parse(event.data) as ClientMessage;
-			if (msg.type === "ping") send(ws, { type: "pong", t: msg.t });
-			else if (msg.type === "pad") setPad(id, msg.state);
+			if (msg.type === "ping") {
+				send(ws, { type: "pong", t: msg.t });
+				return;
+			}
+			if (msg.type === "claim") {
+				if (!isSocketId(msg.socket)) return;
+				const result = claimPad(ws, msg.socket);
+				if (!result.ok) {
+					send(ws, { type: "error", error: "socket_taken" });
+					return;
+				}
+				if (result.released !== undefined) clearPad(result.released);
+				send(ws, { type: "hello", socket: msg.socket });
+				void pushStatus();
+				return;
+			}
+			if (msg.type === "watch") {
+				const released = watchPad(ws);
+				if (released !== undefined) clearPad(released);
+				send(ws, { type: "hello", socket: null });
+				if (released !== undefined) void pushStatus();
+				return;
+			}
+			if (msg.type === "pad") {
+				const id = padOf(ws);
+				if (id !== undefined) setPad(id, msg.state);
+			}
 		} catch {
 			// ignore bad frames
 		}
 	});
 
 	ws.addEventListener("close", () => {
-		clearPad(id);
-		releaseSocket(id);
+		const released = dropViewer(ws);
+		if (released === undefined) return;
+		clearPad(released);
 		void pushStatus();
 	});
 }
@@ -61,29 +86,7 @@ export default new Router()
 			});
 		}
 
-		const requested = parseSocketId(req.query.socket);
-		if (req.query.socket && requested === undefined) {
-			return res.status(400).json({
-				success: false as const,
-				error: "socket_invalid",
-			});
-		}
-
-		const claimed = claimSocket(requested);
-		if ("error" in claimed) {
-			return res.status(claimed.status).json({
-				success: false as const,
-				error: claimed.error,
-			});
-		}
-
-		try {
-			const { socket, response } = Deno.upgradeWebSocket(req.raw);
-			bind(socket, claimed.id);
-			return response;
-		} catch (error) {
-			releaseSocket(claimed.id);
-			void pushStatus();
-			throw error;
-		}
+		const { socket, response } = Deno.upgradeWebSocket(req.raw);
+		bind(socket);
+		return response;
 	});

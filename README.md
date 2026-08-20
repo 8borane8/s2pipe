@@ -39,8 +39,8 @@ Switch 2 --HDMI--> capture card --USB--> media (FFmpeg + MediaMTX)
 Browsers --WHEP/inputs--> node --USB serial--> Pico --USB--> Switch 2
 ```
 
-Video signalling (WHEP) goes through the node. The actual WebRTC media goes to `MEDIA_ICE_IP:MEDIA_ICE_PORT`. Up to four
-browsers can watch; only four WebSockets occupy pads.
+Video signalling (WHEP) goes through the node. The actual WebRTC media goes to `MEDIA_ICE_IP:MEDIA_ICE_PORT`. Any number
+of browsers can watch. They all open the same WebSocket. Up to four can claim a pad.
 
 ## Run
 
@@ -101,13 +101,13 @@ On the LAN set `NODE_BASE_URL=http://192.168.1.20:5050` and `MEDIA_ICE_IP=192.16
 
 ## Node API
 
-| Route                 | What                                                   |
-| --------------------- | ------------------------------------------------------ |
-| `GET /health`         | Capture, Pico, and the four sockets                    |
-| `GET /socket?socket=` | WebSocket **is** the pad (1–4, or first free)          |
-| `POST /switch/whep`   | WHEP offer; `PATCH` / `DELETE` `/switch/whep/:session` |
+| Route               | What                                                   |
+| ------------------- | ------------------------------------------------------ |
+| `GET /health`       | Connect-page check: capture, Pico, sockets             |
+| `GET /socket`       | WebSocket: status, ping, claim or watch a pad          |
+| `POST /switch/whep` | WHEP offer; `PATCH` / `DELETE` `/switch/whep/:session` |
 
-Video is public. A socket holds a pad until the WebSocket closes.
+Video is public. Everyone on the play page stays on the WebSocket. A claimed pad is held until Watch or disconnect.
 
 ## Layout
 

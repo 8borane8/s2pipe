@@ -66,3 +66,7 @@ export function sanitizePad(state: PadState): PadState {
 		ry: clampAxis(state.ry),
 	};
 }
+
+export function samePad(a: PadState, b: PadState): boolean {
+	return a.buttons === b.buttons && a.lx === b.lx && a.ly === b.ly && a.rx === b.rx && a.ry === b.ry;
+}

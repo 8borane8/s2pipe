@@ -27,9 +27,12 @@ export type NodeStatus = {
 
 export type ClientMessage =
 	| { type: "pad"; state: PadState }
-	| { type: "ping"; t: number };
+	| { type: "ping"; t: number }
+	| { type: "claim"; socket: SocketId }
+	| { type: "watch" };
 
 export type ServerMessage =
-	| { type: "hello"; socket: SocketId }
+	| { type: "hello"; socket: SocketId | null }
 	| { type: "pong"; t: number }
-	| { type: "status"; capture: CaptureStatus; pico: PicoStatus; sockets: SocketStatus[] };
+	| { type: "status"; capture: CaptureStatus; pico: PicoStatus; sockets: SocketStatus[] }
+	| { type: "error"; error: "socket_taken" };
