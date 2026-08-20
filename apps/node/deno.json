@@ -1,0 +1,20 @@
+{
+	"name": "@s2pipe/node",
+	"version": "0.1.0",
+	"exports": "./src/mod.ts",
+
+	"tasks": {
+		"start": "deno run -A ./src/index.ts",
+		"dev": "deno run -A --watch --env-file ./src/index.ts"
+	},
+
+	"imports": {
+		"@/": "./src/"
+	},
+
+	"lint": {
+		"rules": {
+			"exclude": ["no-slow-types"]
+		}
+	}
+}

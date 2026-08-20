@@ -1,0 +1,9 @@
+{
+	"name": "@s2pipe/shared",
+	"version": "0.1.0",
+
+	"exports": {
+		"./types/pad": "./types/pad.ts",
+		"./types/node": "./types/node.ts"
+	}
+}

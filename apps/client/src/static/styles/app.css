@@ -1,0 +1,28 @@
+#root {
+	height: 100dvh;
+	max-height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: #000;
+}
+
+#app {
+	min-height: 0;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+@media (max-width: 640px) {
+	#root {
+		height: 100svh;
+		max-height: 100svh;
+	}
+
+	#app {
+		padding-left: env(safe-area-inset-left, 0px);
+		padding-right: env(safe-area-inset-right, 0px);
+	}
+}

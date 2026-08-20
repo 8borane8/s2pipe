@@ -1,0 +1,5 @@
+services:
+    media:
+        environment:
+            FFMPEG_ENCODER: h264_nvenc
+        gpus: all

@@ -1,0 +1,26 @@
+{
+	"lock": false,
+	"workspace": ["./apps/*", "./shared"],
+	"minimumDependencyAge": "0",
+
+	"imports": {
+		"@webtools/slick-server": "jsr:@webtools/slick-server@^0.6.28",
+		"@webtools/slick-client": "jsr:@webtools/slick-client@^0.3.17",
+		"@webtools/expressapi": "jsr:@webtools/expressapi@^0.9.7",
+
+		"preact": "npm:preact@^10.29.8",
+		"preact/hooks": "npm:preact@^10.29.8/hooks",
+		"preact/compat": "npm:preact@^10.29.8/compat",
+		"preact/jsx-runtime": "npm:preact@^10.29.8/jsx-runtime",
+		"preact-root-fragment": "npm:preact-root-fragment@^0.3.1",
+		"@preact/signals": "npm:@preact/signals@^2.11.1",
+
+		"lucide-preact": "npm:lucide-preact@^1.31.0"
+	},
+
+	"fmt": {
+		"indentWidth": 4,
+		"lineWidth": 120,
+		"useTabs": true
+	}
+}

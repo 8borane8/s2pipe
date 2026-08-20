@@ -1,0 +1,50 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap");
+
+:root {
+	color-scheme: dark;
+
+	--font-sans: "Outfit", "Segoe UI", sans-serif;
+	--font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+
+	--bg: #07080a;
+	--surface: #0e1014;
+	--elevated: #15181e;
+	--line: #2a303a;
+	--text: #eef1f4;
+	--muted: #8b929c;
+	--accent: #3ee6a0;
+	--accent-hover: #62f0b3;
+	--on-accent: #04140c;
+	--danger: #ff5c6e;
+
+	--text-sm: 0.8125rem;
+	--text-md: 0.9375rem;
+	--text-lg: 1.125rem;
+	--text-xl: 1.5rem;
+	--text-2xl: 2rem;
+
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+
+	--radius: 2px;
+	--ease: 140ms ease;
+}
+
+html,
+body {
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: var(--text-md);
+	font-weight: 400;
+	line-height: 1.4;
+	background: var(--bg);
+}
+
+#root,
+#app {
+	width: 100%;
+}

@@ -1,0 +1,14 @@
+FROM denoland/deno:2.9.5
+
+WORKDIR /app
+
+COPY deno.json ./
+COPY shared ./shared
+COPY apps/node ./apps/node
+COPY apps/client ./apps/client
+
+WORKDIR /app/apps/client
+
+RUN deno cache src/index.ts
+
+CMD ["task", "start"]

@@ -1,0 +1,74 @@
+@charset "utf-8";
+
+*:where(:not(html, iframe, canvas, img, svg, video, audio):not(svg *, symbol *)) {
+	all: unset;
+	display: revert;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	width: 100%;
+	min-height: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	text-size-adjust: 100%;
+}
+
+a,
+button,
+label,
+select {
+	cursor: pointer;
+}
+
+ul {
+	list-style: none;
+}
+
+img,
+video,
+canvas,
+svg {
+	display: block;
+	max-width: 100%;
+}
+
+img,
+video {
+	height: auto;
+}
+
+input {
+	user-select: auto;
+	cursor: text;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+	all: revert;
+	appearance: auto;
+	width: 1.1rem;
+	height: 1.1rem;
+	margin: 0;
+	accent-color: var(--accent);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+::placeholder {
+	color: unset;
+	opacity: 1;
+}
+
+:where([hidden]) {
+	display: none !important;
+}

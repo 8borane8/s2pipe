@@ -1,0 +1,151 @@
+.brand {
+	color: var(--text);
+	font-size: var(--text-lg);
+	font-weight: 700;
+	letter-spacing: -0.06em;
+	text-decoration: none;
+}
+
+.brand > span {
+	color: var(--accent);
+}
+
+.btn {
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: var(--text-sm);
+	font-weight: 500;
+	line-height: 1.2;
+
+	display: inline-flex;
+	justify-content: center;
+	align-items: center;
+	gap: var(--space-2);
+
+	padding: var(--space-2) var(--space-3);
+
+	background: var(--elevated);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.btn:hover {
+	border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.btn-primary {
+	color: var(--on-accent);
+	background: var(--accent);
+	border-color: var(--accent);
+	font-weight: 600;
+}
+
+.btn-primary:hover {
+	background: var(--accent-hover);
+	border-color: var(--accent-hover);
+}
+
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.btn-icon {
+	width: 2.25rem;
+	height: 2.25rem;
+	min-width: 2.25rem;
+	min-height: 2.25rem;
+	padding: 0;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+}
+
+.field > span {
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.field > select,
+.field > input[type="url"],
+.field > input[type="range"] {
+	appearance: auto;
+}
+
+.field > input:not([type="checkbox"]):not([type="range"]),
+.field > select {
+	width: 100%;
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: var(--text-md);
+	padding: var(--space-2) var(--space-3);
+	background: var(--bg);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+}
+
+.field > select {
+	display: flex;
+	align-items: center;
+	height: 2.5rem;
+	padding-top: 0;
+	padding-bottom: 0;
+	line-height: 2.5rem;
+}
+
+.field > input:not([type="checkbox"]):not([type="range"]):focus,
+.field > select:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+.field > input[type="range"] {
+	padding: 0;
+	background: transparent;
+	border: 0;
+}
+
+.field > input::placeholder {
+	color: var(--muted);
+}
+
+.error {
+	color: var(--danger);
+	font-size: var(--text-sm);
+}
+
+.pill {
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+
+	padding: 0.2rem 0.5rem;
+	background: rgb(0 0 0 / 0.4);
+	border: 1px solid rgb(255 255 255 / 0.08);
+	border-radius: 99px;
+}
+
+.pill[data-ok="true"] {
+	color: var(--accent);
+	border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.pill[data-ok="false"] {
+	color: var(--danger);
+	border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}

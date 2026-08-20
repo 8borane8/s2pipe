@@ -1,0 +1,12 @@
+.git
+.cursor
+.vscode
+**/.env
+**/.env.example
+**/data
+**/node_modules
+**/.DS_Store
+*.md
+TODO.md
+LICENCE
+firmware

@@ -1,0 +1,59 @@
+name: s2pipe
+
+services:
+    media:
+        profiles: ["all", "node"]
+        restart: unless-stopped
+        init: true
+        build:
+            context: .
+            dockerfile: docker/Dockerfile.media
+        ports:
+            - "${MEDIA_ICE_PORT}:${MEDIA_ICE_PORT}/udp"
+            - "${MEDIA_ICE_PORT}:${MEDIA_ICE_PORT}/tcp"
+        environment:
+            MEDIA_ICE_IP: ${MEDIA_ICE_IP}
+            MEDIA_ICE_PORT: ${MEDIA_ICE_PORT}
+            CAPTURE_SOURCE: ${CAPTURE_SOURCE}
+            CAPTURE_DEVICE: ${CAPTURE_DEVICE}
+            CAPTURE_AUDIO: ${CAPTURE_AUDIO}
+            CAPTURE_WIDTH: ${CAPTURE_WIDTH}
+            CAPTURE_HEIGHT: ${CAPTURE_HEIGHT}
+            CAPTURE_FPS: ${CAPTURE_FPS}
+            FFMPEG_ENCODER: ${FFMPEG_ENCODER}
+            FFMPEG_EXTRA: ${FFMPEG_EXTRA}
+        # Linux: pass through the capture card
+        # devices:
+        #     - /dev/video0:/dev/video0
+
+    node:
+        profiles: ["all", "node"]
+        restart: unless-stopped
+        depends_on:
+            - media
+        build:
+            context: .
+            dockerfile: docker/Dockerfile.node
+        ports:
+            - "${NODE_PORT}:${NODE_PORT}"
+        environment:
+            NODE_PORT: ${NODE_PORT}
+            NODE_BASE_URL: ${NODE_BASE_URL}
+            MEDIA_HOST: media
+            CAPTURE_SOURCE: ${CAPTURE_SOURCE}
+            PICO_SERIAL: ${PICO_SERIAL}
+        # Linux: pass through the Pico
+        # devices:
+        #     - /dev/ttyACM0:/dev/ttyACM0
+
+    client:
+        profiles: ["all", "client"]
+        restart: unless-stopped
+        build:
+            context: .
+            dockerfile: docker/Dockerfile.client
+        ports:
+            - "${CLIENT_PORT}:${CLIENT_PORT}"
+        environment:
+            CLIENT_PORT: ${CLIENT_PORT}
+            NODE_BASE_URL: ${NODE_BASE_URL}
