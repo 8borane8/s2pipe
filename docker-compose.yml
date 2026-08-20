@@ -42,9 +42,9 @@ services:
             MEDIA_HOST: media
             CAPTURE_SOURCE: ${CAPTURE_SOURCE}
             PICO_SERIAL: ${PICO_SERIAL}
-        # Linux: pass through the Pico
+        # Linux: USB-UART adapter from the Pico (921600 8N1, GPIO4/5)
         # devices:
-        #     - /dev/ttyACM0:/dev/ttyACM0
+        #     - /dev/ttyUSB0:/dev/ttyUSB0
 
     client:
         profiles: ["all", "client"]

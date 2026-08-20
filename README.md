@@ -10,8 +10,8 @@ Everything runs on **your** machine and your network. No cloud service, no subsc
 
 The API has **no authentication**. It is meant for a trusted local or LAN setup. Do not expose it to the Internet.
 
-The **node** (HTTP, sockets, Pico, WHEP proxy), **media** pipeline (FFmpeg + MediaMTX), and **client** (Slick + Preact)
-are in place. Pico firmware is not written yet.
+The **node** (HTTP, sockets, Pico, WHEP proxy), **media** pipeline (FFmpeg + MediaMTX), **client** (Slick + Preact),
+and **Pico firmware** are in place.
 
 ## Why s2pipe
 
@@ -21,7 +21,7 @@ a browser is enough.
 
 ## Hardware
 
-- A Switch 2, an HDMI capture card, a Raspberry Pico.
+- A Switch 2, an HDMI capture card, a Raspberry Pico, a USB-UART adapter (Pico UART to the node).
 - A PC (Linux preferred) for the node: capture, encode, USB to the Pico.
 - Optional NVIDIA GPU for hardware encoding (`nvenc`).
 
@@ -62,7 +62,7 @@ NVIDIA GPU:
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile all up --build
 ```
 
-Uncomment `devices` in `docker-compose.yml` for `/dev/video0` (media) and `/dev/ttyACM0` (node).
+Uncomment `devices` in `docker-compose.yml` for `/dev/video0` (media) and `/dev/ttyUSB0` (node, Pico UART).
 
 Open `http://localhost:5000`. With `--profile all`, the client uses `NODE_BASE_URL` from `.env` (default
 `http://localhost:5050`) and skips the connect page. On the LAN set both `NODE_BASE_URL` and `MEDIA_ICE_IP` to the host
@@ -93,7 +93,7 @@ Defaults live in `.env.example`.
 | `CAPTURE_SOURCE`                   | `test`, `v4l2`, or `custom`                            |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | V4L2 (and optional ALSA) device                        |
 | `FFMPEG_ENCODER`                   | `libx264` or `h264_nvenc` (GPU overlay forces nvenc)   |
-| `PICO_SERIAL`                      | Serial path; empty = no Pico, pads are still accepted  |
+| `PICO_SERIAL`                      | UART adapter path (`/dev/ttyUSB0`, `COM3`); empty = no Pico |
 | `CLIENT_PORT`                      | Client listen port (5000)                              |
 
 On the LAN set `NODE_BASE_URL=http://192.168.1.20:5050` and `MEDIA_ICE_IP=192.168.1.20`, and forward `NODE_PORT` plus
@@ -115,13 +115,12 @@ Video is public. Everyone on the play page stays on the WebSocket. A claimed pad
 s2pipe/
 ├── apps/node/          # Deno: HTTP, sockets, Pico, WHEP proxy
 ├── apps/client/        # Slick + Preact: connect the node, play HUD, inputs
+├── firmware/           # Pico: UART from the node, 4 USB pads to the Switch
 ├── shared/             # Pad and node types
 ├── docker/             # Node, media, and client images
 ├── docker-compose.yml
 └── docker-compose.gpu.yml
 ```
-
-Planned: `firmware/` (Pico, 4 controllers).
 
 ## License
 

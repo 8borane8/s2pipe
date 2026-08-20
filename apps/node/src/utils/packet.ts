@@ -1,8 +1,10 @@
 import { neutralPad, type PadState, type SocketId, SOCKETS } from "@s2pipe/shared/types/pad";
 
+// Keep in sync with firmware/packet.h
 const PACKET_SIZE = 64;
 const PACKET_MAGIC = 0x5332;
 const PACKET_VERSION = 1;
+
 
 function crc16ccitt(data: Uint8Array): number {
 	let crc = 0xffff;

@@ -85,10 +85,39 @@ function startTimers(): void {
 	}
 }
 
+const SERIAL_BAUD = 921600;
+
+function windowsComPort(path: string): string | null {
+	const match = path.match(/(?:\\\\\.\\)?(COM\d+)$/i);
+	return match ? match[1].toUpperCase() : null;
+}
+
+async function setSerialBaud(path: string): Promise<void> {
+	if (Deno.build.os === "windows") {
+		const com = windowsComPort(path);
+		if (!com) return;
+		const command = new Deno.Command("mode", {
+			args: [`${com}:`, `BAUD=${SERIAL_BAUD}`, "PARITY=N", "DATA=8", "STOP=1"],
+			stdout: "null",
+			stderr: "null",
+		});
+		await command.output();
+		return;
+	}
+
+	const command = new Deno.Command("stty", {
+		args: ["-F", path, String(SERIAL_BAUD), "raw", "-echo", "cs8", "-parenb", "-cstopb"],
+		stdout: "null",
+		stderr: "null",
+	});
+	await command.output();
+}
+
 async function openPico(): Promise<void> {
 	if (!config.picoSerial || file) return;
 
 	try {
+		await setSerialBaud(config.picoSerial);
 		file = await Deno.open(config.picoSerial, { read: true, write: true });
 		writer = file.writable.getWriter();
 		picoError = null;
