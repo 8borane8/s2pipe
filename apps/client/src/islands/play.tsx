@@ -32,18 +32,12 @@ function wsUrl(nodeUrl: string, socket: SocketId): string {
 	return url.href;
 }
 
-function sourceLabel(source: InputSource, pads: GamepadOption[]): string {
-	if (source.kind === "keyboard") return "Keyboard & mouse";
-	return pads.find((pad) => pad.index === source.index)?.id ?? `Gamepad ${source.index}`;
-}
-
 export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const stageRef = useRef<HTMLElement>(null);
 	const whepRef = useRef<WhepHandle | null>(null);
 	const wsRef = useRef<WebSocket | null>(null);
 	const inputRef = useRef<ReturnType<typeof createInputTracker> | null>(null);
-	const seqRef = useRef(0);
 	const statsPrev = useRef<{ bytes: number; at: number } | null>(null);
 	const idleTimer = useRef<ReturnType<typeof setTimeout> | 0>(0);
 	const toastSeq = useRef(0);
@@ -59,7 +53,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const muted = useSignal(false);
 	const volume = useSignal(1);
 	const fill = useSignal(false);
-	const showStats = useSignal(false);
 	const stats = useSignal<StreamStats | null>(null);
 	const fullscreen = useSignal(false);
 	const idle = useSignal(false);
@@ -114,9 +107,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}, [nodeUrl]);
 
 	useEffect(() => {
-		let timer: ReturnType<typeof setInterval> | undefined;
+		const api = createClient(nodeUrl);
 		const tick = () => {
-			createClient().get("/health").then((res) => {
+			api.get("/health").then((res) => {
 				if (!res.success) return;
 				capture.value = res.data.capture;
 				pico.value = res.data.pico;
@@ -124,11 +117,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}).catch(() => {});
 		};
 		tick();
-		timer = setInterval(tick, 1500);
-		return () => {
-			if (timer !== undefined) clearInterval(timer);
-		};
-	}, []);
+		const timer = setInterval(tick, 1500);
+		return () => clearInterval(timer);
+	}, [nodeUrl]);
 
 	useEffect(() => {
 		if (claimedId === null) {
@@ -201,25 +192,29 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		globalThis.addEventListener("gamepadconnected", onPads);
 		globalThis.addEventListener("gamepaddisconnected", onPads);
 
-		let frame = 0;
-		const loop = () => {
-			frame = requestAnimationFrame(loop);
-			const ws = wsRef.current;
-			if (!ws || ws.readyState !== WebSocket.OPEN || claimed.value === null) return;
-			const state = tracker.sample(source.value);
-			const msg: ClientMessage = { type: "pad", seq: ++seqRef.current, state };
-			ws.send(JSON.stringify(msg));
-		};
-		frame = requestAnimationFrame(loop);
-
 		return () => {
-			cancelAnimationFrame(frame);
 			tracker.detach();
 			inputRef.current = null;
 			globalThis.removeEventListener("gamepadconnected", onPads);
 			globalThis.removeEventListener("gamepaddisconnected", onPads);
+			if (idleTimer.current) clearTimeout(idleTimer.current);
 		};
 	}, []);
+
+	useEffect(() => {
+		if (claimedId === null) return;
+		let frame = 0;
+		const loop = () => {
+			frame = requestAnimationFrame(loop);
+			const tracker = inputRef.current;
+			const ws = wsRef.current;
+			if (!tracker || !ws || ws.readyState !== WebSocket.OPEN) return;
+			const msg: ClientMessage = { type: "pad", state: tracker.sample(source.value) };
+			ws.send(JSON.stringify(msg));
+		};
+		frame = requestAnimationFrame(loop);
+		return () => cancelAnimationFrame(frame);
+	}, [claimedId]);
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
@@ -240,10 +235,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}, [muted.value, volume.value]);
 
 	useEffect(() => {
-		if (!showStats.value) {
-			stats.value = null;
-			return;
-		}
 		const timer = globalThis.setInterval(() => {
 			const pc = whepRef.current?.pc;
 			if (!pc) return;
@@ -253,7 +244,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}).catch(() => {});
 		}, 1000);
 		return () => clearInterval(timer);
-	}, [showStats.value]);
+	}, []);
 
 	useEffect(() => {
 		const onFs = () => {
@@ -330,22 +321,20 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				}}
 			/>
 
-			{showStats.value && stats.value && (
-				<dl class="play-stats">
-					<div>
-						<dt>Bitrate</dt>
-						<dd>{stats.value.bitrateKbps} kb/s</dd>
-					</div>
-					<div>
-						<dt>FPS</dt>
-						<dd>{Math.round(stats.value.fps)}</dd>
-					</div>
-					<div>
-						<dt>Lost</dt>
-						<dd>{stats.value.packetsLost}</dd>
-					</div>
-				</dl>
-			)}
+			<dl class="play-stats">
+				<div>
+					<dt>Bitrate</dt>
+					<dd>{stats.value ? `${stats.value.bitrateKbps} kb/s` : "-"}</dd>
+				</div>
+				<div>
+					<dt>FPS</dt>
+					<dd>{stats.value ? Math.round(stats.value.fps) : "-"}</dd>
+				</div>
+				<div>
+					<dt>Lost</dt>
+					<dd>{stats.value ? stats.value.packetsLost : "-"}</dd>
+				</div>
+			</dl>
 
 			<div class="play-hud" onClick={(event) => event.stopPropagation()}>
 				<div class="play-top">
@@ -390,37 +379,45 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					</div>
 				</div>
 
-				<div class="play-bottom">
-					<p class="play-input">{sourceLabel(inputSource, padList)}</p>
-					<div class="play-tools">
-						<button
-							type="button"
-							class="btn btn-icon"
-							aria-label={muted.value ? "Unmute" : "Mute"}
-							onClick={() => muted.value = !muted.value}
-						>
-							{muted.value ? <VolumeX size={16} /> : <Volume2 size={16} />}
-						</button>
-						<button
-							type="button"
-							class="btn btn-icon"
-							aria-label={fullscreen.value ? "Exit fullscreen" : "Fullscreen"}
-							onClick={toggleFullscreen}
-						>
-							{fullscreen.value ? <Minimize size={16} /> : <Maximize size={16} />}
-						</button>
-						<button
-							type="button"
-							class="btn btn-icon"
-							aria-label="Settings"
-							onClick={() => {
-								settings.value = !settings.value;
-								idle.value = false;
-							}}
-						>
-							<Settings size={16} />
-						</button>
-					</div>
+				<label class="play-controller">
+					<select
+						aria-label="Controller"
+						value={inputSource.kind === "keyboard" ? "keyboard" : String(inputSource.index)}
+						onChange={onSourceChange}
+					>
+						<option value="keyboard">Keyboard & mouse</option>
+						{padList.map((pad) => <option value={String(pad.index)}>{pad.id}</option>)}
+					</select>
+				</label>
+
+				<div class="play-tools">
+					<button
+						type="button"
+						class="btn btn-icon"
+						aria-label={muted.value ? "Unmute" : "Mute"}
+						onClick={() => muted.value = !muted.value}
+					>
+						{muted.value ? <VolumeX size={16} /> : <Volume2 size={16} />}
+					</button>
+					<button
+						type="button"
+						class="btn btn-icon"
+						aria-label={fullscreen.value ? "Exit fullscreen" : "Fullscreen"}
+						onClick={toggleFullscreen}
+					>
+						{fullscreen.value ? <Minimize size={16} /> : <Maximize size={16} />}
+					</button>
+					<button
+						type="button"
+						class="btn btn-icon"
+						aria-label="Settings"
+						onClick={() => {
+							settings.value = !settings.value;
+							idle.value = false;
+						}}
+					>
+						<Settings size={16} />
+					</button>
 				</div>
 			</div>
 
@@ -447,17 +444,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					</div>
 
 					<label class="field">
-						<span>Controller</span>
-						<select
-							value={inputSource.kind === "keyboard" ? "keyboard" : String(inputSource.index)}
-							onChange={onSourceChange}
-						>
-							<option value="keyboard">Keyboard & mouse</option>
-							{padList.map((pad) => <option value={String(pad.index)}>{pad.id}</option>)}
-						</select>
-					</label>
-
-					<label class="field">
 						<span>Volume</span>
 						<input
 							type="range"
@@ -479,15 +465,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							onChange={(event) => fill.value = (event.target as HTMLInputElement).checked}
 						/>
 						Fill (crop) instead of letterbox
-					</label>
-
-					<label class="play-check">
-						<input
-							type="checkbox"
-							checked={showStats.value}
-							onChange={(event) => showStats.value = (event.target as HTMLInputElement).checked}
-						/>
-						Overlay WebRTC stats
 					</label>
 
 					<section class="play-help">

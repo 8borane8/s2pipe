@@ -26,7 +26,7 @@ export type NodeStatus = {
 };
 
 export type ClientMessage =
-	| { type: "pad"; seq: number; state: PadState }
+	| { type: "pad"; state: PadState }
 	| { type: "ping"; t: number };
 
 export type ServerMessage =

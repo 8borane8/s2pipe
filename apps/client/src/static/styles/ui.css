@@ -75,14 +75,12 @@
 	text-transform: uppercase;
 }
 
-.field > select,
 .field > input[type="url"],
 .field > input[type="range"] {
 	appearance: auto;
 }
 
-.field > input:not([type="checkbox"]):not([type="range"]),
-.field > select {
+.field > input:not([type="checkbox"]):not([type="range"]) {
 	width: 100%;
 	color: var(--text);
 	font-family: var(--font-sans);
@@ -93,17 +91,7 @@
 	border-radius: var(--radius);
 }
 
-.field > select {
-	display: flex;
-	align-items: center;
-	height: 2.5rem;
-	padding-top: 0;
-	padding-bottom: 0;
-	line-height: 2.5rem;
-}
-
-.field > input:not([type="checkbox"]):not([type="range"]):focus,
-.field > select:focus {
+.field > input:not([type="checkbox"]):not([type="range"]):focus {
 	border-color: var(--accent);
 	outline: none;
 }
