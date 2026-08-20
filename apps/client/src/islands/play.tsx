@@ -53,6 +53,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const muted = useSignal(false);
 	const volume = useSignal(1);
 	const fill = useSignal(false);
+	const showStats = useSignal(false);
 	const stats = useSignal<StreamStats | null>(null);
 	const fullscreen = useSignal(false);
 	const idle = useSignal(false);
@@ -235,6 +236,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}, [muted.value, volume.value]);
 
 	useEffect(() => {
+		if (!showStats.value) {
+			stats.value = null;
+			return;
+		}
 		const timer = globalThis.setInterval(() => {
 			const pc = whepRef.current?.pc;
 			if (!pc) return;
@@ -244,7 +249,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}).catch(() => {});
 		}, 1000);
 		return () => clearInterval(timer);
-	}, []);
+	}, [showStats.value]);
 
 	useEffect(() => {
 		const onFs = () => {
@@ -321,20 +326,22 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				}}
 			/>
 
-			<dl class="play-stats">
-				<div>
-					<dt>Bitrate</dt>
-					<dd>{stats.value ? `${stats.value.bitrateKbps} kb/s` : "-"}</dd>
-				</div>
-				<div>
-					<dt>FPS</dt>
-					<dd>{stats.value ? Math.round(stats.value.fps) : "-"}</dd>
-				</div>
-				<div>
-					<dt>Lost</dt>
-					<dd>{stats.value ? stats.value.packetsLost : "-"}</dd>
-				</div>
-			</dl>
+			{showStats.value && (
+				<dl class="play-stats">
+					<div>
+						<dt>Bitrate</dt>
+						<dd>{stats.value ? `${stats.value.bitrateKbps} kb/s` : "-"}</dd>
+					</div>
+					<div>
+						<dt>FPS</dt>
+						<dd>{stats.value ? Math.round(stats.value.fps) : "-"}</dd>
+					</div>
+					<div>
+						<dt>Lost</dt>
+						<dd>{stats.value ? stats.value.packetsLost : "-"}</dd>
+					</div>
+				</dl>
+			)}
 
 			<div class="play-hud" onClick={(event) => event.stopPropagation()}>
 				<div class="play-top">
@@ -423,7 +430,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 			{settings.value && (
 				<aside class="play-settings" onClick={(event) => event.stopPropagation()}>
-					<header class="play-settings-head">
+					<div>
 						<h2>Settings</h2>
 						<button
 							type="button"
@@ -433,7 +440,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						>
 							<X size={16} />
 						</button>
-					</header>
+					</div>
 
 					<div class="field">
 						<span>Node</span>
@@ -465,6 +472,15 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							onChange={(event) => fill.value = (event.target as HTMLInputElement).checked}
 						/>
 						Fill (crop) instead of letterbox
+					</label>
+
+					<label class="play-check">
+						<input
+							type="checkbox"
+							checked={showStats.value}
+							onChange={(event) => showStats.value = (event.target as HTMLInputElement).checked}
+						/>
+						Overlay WebRTC stats
 					</label>
 
 					<section class="play-help">

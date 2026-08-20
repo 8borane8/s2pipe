@@ -1,17 +1,28 @@
 #root {
 	height: 100dvh;
 	max-height: 100dvh;
+
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
+
 	overflow: hidden;
+
 	background: #000;
 }
 
 #app {
 	min-height: 0;
 	flex: 1 1 auto;
+
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
+
 	overflow: hidden;
 }
 

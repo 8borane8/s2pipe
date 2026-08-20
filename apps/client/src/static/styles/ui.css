@@ -18,8 +18,10 @@
 	line-height: 1.2;
 
 	display: inline-flex;
+	flex-direction: row;
 	justify-content: center;
 	align-items: center;
+	flex-wrap: nowrap;
 	gap: var(--space-2);
 
 	padding: var(--space-2) var(--space-3);
@@ -64,6 +66,9 @@
 .field {
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
 	gap: var(--space-1);
 }
 
@@ -119,7 +124,10 @@
 	text-transform: uppercase;
 
 	display: inline-flex;
+	flex-direction: row;
+	justify-content: flex-start;
 	align-items: center;
+	flex-wrap: nowrap;
 	gap: var(--space-1);
 
 	padding: 0.2rem 0.5rem;

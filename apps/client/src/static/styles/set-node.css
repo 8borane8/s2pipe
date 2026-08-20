@@ -2,13 +2,18 @@
 	width: 100%;
 	min-height: 0;
 	flex: 1 1 auto;
+
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
+	flex-wrap: nowrap;
+
 	padding: var(--space-6);
 	padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+
 	overflow: auto;
+
 	background:
 		radial-gradient(1200px 600px at 50% -10%, rgb(62 230 160 / 0.08), transparent 55%),
 		var(--bg);
@@ -17,8 +22,12 @@
 #set-node > article {
 	width: 100%;
 	max-width: 24rem;
+
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
 	gap: var(--space-4);
 }
 
@@ -43,7 +52,11 @@
 #set-node > article > form {
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
 	gap: var(--space-4);
+
 	margin-top: var(--space-2);
 }
 
