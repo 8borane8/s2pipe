@@ -25,6 +25,8 @@ metrics: false
 paths:
   switch:
     source: publisher
+  switch-audio:
+    source: publisher
 EOF
 
 mediamtx "$yaml" &
@@ -46,12 +48,13 @@ done
 
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
 fps="${CAPTURE_FPS}"
-opus=(-c:a libopus -application lowdelay -b:a 96k -ar 48000 -ac 2)
+opus=(-c:a libopus -application lowdelay -compression_level 0 -b:a 64k -ar 48000 -ac 2)
+rtsp_audio=( -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio )
 
 input=()
 video=()
-audio=()
 extra=()
+apid=""
 
 if [ -n "$FFMPEG_EXTRA" ]; then
 	# shellcheck disable=SC2206
@@ -79,8 +82,9 @@ fi
 
 case "$CAPTURE_SOURCE" in
 	test)
-		input=(-re -f lavfi -i "testsrc2=size=${size}:rate=${fps}" -f lavfi -i "sine=frequency=440:sample_rate=48000")
-		audio=( "${opus[@]}" )
+		input=(-re -f lavfi -i "testsrc2=size=${size}:rate=${fps}")
+		ffmpeg -re -f lavfi -i "sine=frequency=440:sample_rate=48000" "${opus[@]}" "${rtsp_audio[@]}" &
+		apid=$!
 		;;
 	v4l2)
 		if [ ! -e "$CAPTURE_DEVICE" ]; then
@@ -91,12 +95,10 @@ case "$CAPTURE_SOURCE" in
 		# Uncompressed YUY2 1080p60 is ~2 Gb/s; USB (and usbipd) drops frames.
 		# UVC HDMI dongles speak MJPEG. Override with CAPTURE_FORMAT=yuyv if needed.
 		fmt="${CAPTURE_FORMAT:-mjpeg}"
-		input=(-fflags +genpts -f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
+		input=(-f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
 		if [ -n "$CAPTURE_AUDIO" ]; then
-			input+=(-fflags +genpts -f alsa -i "$CAPTURE_AUDIO")
-			audio=( -af aresample=async=1 "${opus[@]}" )
-		else
-			audio=(-an)
+			ffmpeg -f alsa -i "$CAPTURE_AUDIO" "${opus[@]}" "${rtsp_audio[@]}" &
+			apid=$!
 		fi
 		;;
 	*)
@@ -105,13 +107,16 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-# Do not exec: Docker SIGKILL while FFmpeg holds /dev/video0 hangs usbipd/UVC until reboot.
 ffpid=""
 cleanup() {
 	trap - INT TERM
 	if [ -n "$ffpid" ] && kill -0 "$ffpid" 2>/dev/null; then
 		kill -INT "$ffpid" 2>/dev/null || true
 		wait "$ffpid" 2>/dev/null || true
+	fi
+	if [ -n "$apid" ] && kill -0 "$apid" 2>/dev/null; then
+		kill -INT "$apid" 2>/dev/null || true
+		wait "$apid" 2>/dev/null || true
 	fi
 	if kill -0 "$pid" 2>/dev/null; then
 		kill "$pid" 2>/dev/null || true
@@ -120,10 +125,8 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
-	-max_interleave_delta 0 \
+ffmpeg "${input[@]}" "${video[@]}" -an "${extra[@]}" \
 	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch &
 ffpid=$!
 wait "$ffpid" || true
 cleanup
-

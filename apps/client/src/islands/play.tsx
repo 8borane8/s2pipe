@@ -12,7 +12,7 @@ import {
 	KEYBOARD_HELP,
 	listGamepads,
 } from "../utils/input.ts";
-import { readStreamStats, startWhep, type StreamStats, type WhepHandle } from "../utils/whep.ts";
+import { readStreamStats, startAudioWhep, startWhep, type AudioWhepHandle, type StreamStats, type WhepHandle } from "../utils/whep.ts";
 
 type Props = {
 	nodeUrl: string;
@@ -37,6 +37,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const stageRef = useRef<HTMLElement>(null);
 	const whepRef = useRef<WhepHandle | null>(null);
+	const audioRef = useRef<AudioWhepHandle | null>(null);
 	const wsRef = useRef<WebSocket | null>(null);
 	const inputRef = useRef<ReturnType<typeof createInputTracker> | null>(null);
 	const statsPrev = useRef<{ bytes: number; at: number } | null>(null);
@@ -87,6 +88,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		if (!video) return;
 		let cancelled = false;
 		let handle: WhepHandle | null = null;
+		let audioHandle: AudioWhepHandle | null = null;
 
 		startWhep(nodeUrl, video, () => {
 			toast("ICE failed. Set MEDIA_ICE_IP to this machine’s LAN address, not 127.0.0.1.");
@@ -97,16 +99,28 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}
 			handle = next;
 			whepRef.current = next;
-			next.audio.muted = muted.value;
-			next.audio.volume = volume.value;
 		}).catch(() => {
 			if (!cancelled) toast("Could not start the stream.");
 		});
 
+		startAudioWhep(nodeUrl).then((next) => {
+			if (!next) return;
+			if (cancelled) {
+				void next.close();
+				return;
+			}
+			audioHandle = next;
+			audioRef.current = next;
+			next.audio.muted = muted.value;
+			next.audio.volume = volume.value;
+		}).catch(() => {});
+
 		return () => {
 			cancelled = true;
 			whepRef.current = null;
+			audioRef.current = null;
 			void handle?.close();
+			void audioHandle?.close();
 		};
 	}, [nodeUrl]);
 
@@ -220,7 +234,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	useEffect(() => {
 		const video = videoRef.current;
 		if (video) video.muted = true;
-		const audio = whepRef.current?.audio;
+		const audio = audioRef.current?.audio;
 		if (!audio) return;
 		audio.muted = muted.value;
 		audio.volume = volume.value;
@@ -277,7 +291,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	function onStageClick(): void {
 		bumpHud();
 		void videoRef.current?.play();
-		void whepRef.current?.audio.play();
+		void audioRef.current?.audio?.play();
 		if (!playing.value || settings.value) return;
 		videoRef.current?.requestPointerLock().catch(() => {});
 	}

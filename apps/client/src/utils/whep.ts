@@ -1,8 +1,14 @@
 export type WhepHandle = {
 	pc: RTCPeerConnection;
+	close: () => Promise<void>;
+};
+
+export type AudioWhepHandle = {
 	audio: HTMLAudioElement;
 	close: () => Promise<void>;
 };
+
+const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 	if (pc.iceGatheringState === "complete") return Promise.resolve();
@@ -20,44 +26,16 @@ function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 	});
 }
 
-export async function startWhep(
+async function postWhep(
 	nodeUrl: string,
-	video: HTMLVideoElement,
-	onIceFailed: () => void,
-): Promise<WhepHandle> {
-	const pc = new RTCPeerConnection({
-		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-	});
-
-	const audio = new Audio();
-	audio.autoplay = true;
-
-	pc.addTransceiver("video", { direction: "recvonly" });
-	pc.addTransceiver("audio", { direction: "recvonly" });
-	video.muted = true;
-
-	pc.addEventListener("track", (event) => {
-		const stream = new MediaStream([event.track]);
-		if (event.track.kind === "video") {
-			video.srcObject = stream;
-			void video.play().catch(() => {});
-			return;
-		}
-		if (event.track.kind === "audio") {
-			audio.srcObject = stream;
-			void audio.play().catch(() => {});
-		}
-	});
-
-	pc.addEventListener("connectionstatechange", () => {
-		if (pc.connectionState === "failed") onIceFailed();
-	});
-
+	route: string,
+	pc: RTCPeerConnection,
+): Promise<string | null> {
 	const offer = await pc.createOffer();
 	await pc.setLocalDescription(offer);
 	await waitIceGathering(pc);
 
-	const response = await fetch(`${nodeUrl}/switch/whep`, {
+	const response = await fetch(`${nodeUrl}${route}`, {
 		method: "POST",
 		headers: { "content-type": "application/sdp" },
 		body: pc.localDescription?.sdp ?? offer.sdp,
@@ -65,25 +43,79 @@ export async function startWhep(
 
 	if (!response.ok) {
 		pc.close();
-		audio.pause();
-		throw new Error("whep");
+		return null;
 	}
 
 	const answer = await response.text();
 	const location = response.headers.get("location");
 	await pc.setRemoteDescription({ type: "answer", sdp: answer });
+	return location;
+}
 
+function closeWhep(pc: RTCPeerConnection, nodeUrl: string, location: string | null): () => Promise<void> {
+	return async () => {
+		pc.close();
+		if (!location) return;
+		const resource = new URL(location, `${nodeUrl}/`).href;
+		await fetch(resource, { method: "DELETE" }).catch(() => {});
+	};
+}
+
+export async function startWhep(
+	nodeUrl: string,
+	video: HTMLVideoElement,
+	onIceFailed: () => void,
+): Promise<WhepHandle> {
+	const pc = new RTCPeerConnection(ice);
+	pc.addTransceiver("video", { direction: "recvonly" });
+	video.muted = true;
+
+	pc.addEventListener("track", (event) => {
+		if (event.track.kind !== "video") return;
+		video.srcObject = new MediaStream([event.track]);
+		void video.play().catch(() => {});
+	});
+	pc.addEventListener("connectionstatechange", () => {
+		if (pc.connectionState === "failed") onIceFailed();
+	});
+
+	const location = await postWhep(nodeUrl, "/switch/whep", pc);
+	if (!pc.remoteDescription) throw new Error("whep");
+
+	const close = closeWhep(pc, nodeUrl, location);
 	return {
 		pc,
+		close: async () => {
+			video.srcObject = null;
+			await close();
+		},
+	};
+}
+
+export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle | null> {
+	const pc = new RTCPeerConnection(ice);
+	const audio = new Audio();
+	audio.autoplay = true;
+	pc.addTransceiver("audio", { direction: "recvonly" });
+	pc.addEventListener("track", (event) => {
+		if (event.track.kind !== "audio") return;
+		audio.srcObject = new MediaStream([event.track]);
+		void audio.play().catch(() => {});
+	});
+
+	const location = await postWhep(nodeUrl, "/switch-audio/whep", pc);
+	if (!pc.remoteDescription) {
+		audio.pause();
+		return null;
+	}
+
+	const close = closeWhep(pc, nodeUrl, location);
+	return {
 		audio,
 		close: async () => {
-			pc.close();
 			audio.pause();
 			audio.srcObject = null;
-			video.srcObject = null;
-			if (!location) return;
-			const resource = new URL(location, `${nodeUrl}/`).href;
-			await fetch(resource, { method: "DELETE" }).catch(() => {});
+			await close();
 		},
 	};
 }

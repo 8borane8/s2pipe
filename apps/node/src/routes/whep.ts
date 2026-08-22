@@ -38,4 +38,7 @@ async function forward(req: HttpRequest, res: HttpResponse): Promise<Response> {
 export default new Router()
 	.post("/switch/whep", forward)
 	.patch("/switch/whep/:session", forward)
-	.delete("/switch/whep/:session", forward);
+	.delete("/switch/whep/:session", forward)
+	.post("/switch-audio/whep", forward)
+	.patch("/switch-audio/whep/:session", forward)
+	.delete("/switch-audio/whep/:session", forward);
