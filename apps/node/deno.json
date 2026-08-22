@@ -5,7 +5,7 @@
 
 	"tasks": {
 		"start": "deno run -A ./src/index.ts",
-		"dev": "deno run -A --watch --env-file=.env ./src/index.ts"
+		"dev": "deno run -A --watch --env-file ./src/index.ts"
 	},
 
 	"imports": {

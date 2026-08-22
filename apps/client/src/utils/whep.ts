@@ -14,7 +14,7 @@ function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 		const onChange = () => {
 			if (pc.iceGatheringState === "complete") done();
 		};
-		const timer = setTimeout(done, 500);
+		const timer = setTimeout(done, 2000);
 		pc.addEventListener("icegatheringstatechange", onChange);
 	});
 }
@@ -24,7 +24,9 @@ export async function startWhep(
 	video: HTMLVideoElement,
 	onIceFailed: () => void,
 ): Promise<WhepHandle> {
-	const pc = new RTCPeerConnection({ iceServers: [] });
+	const pc = new RTCPeerConnection({
+		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+	});
 
 	pc.addTransceiver("video", { direction: "recvonly" });
 	pc.addTransceiver("audio", { direction: "recvonly" });
