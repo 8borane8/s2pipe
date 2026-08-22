@@ -30,12 +30,9 @@ if ($LASTEXITCODE -ne 0) {
 	Write-Error "bind failed. Open PowerShell as Administrator and run this once."
 }
 
-$list = usbipd list | Out-String
-if ($list -notmatch "(?m)^$([regex]::Escape($BusId))\s.+\sAttached") {
-	usbipd attach --wsl --busid $BusId
-	if ($LASTEXITCODE -ne 0) {
-		Write-Error "attach failed. Install Ubuntu (wsl --install -d Ubuntu), start Docker Desktop, retry."
-	}
+usbipd attach --wsl --busid $BusId
+if ($LASTEXITCODE -ne 0) {
+	Write-Error "attach failed. Install Ubuntu (wsl --install -d Ubuntu), start Docker Desktop, retry."
 }
 
 usbipd list
