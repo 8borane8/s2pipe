@@ -1,7 +1,7 @@
 import { config } from "@/config.ts";
 import { padMask } from "@/services/sockets.ts";
 import { encodePacket } from "@/utils/packet.ts";
-import { type PadState, PAD_COUNT, samePad, sanitizePad, neutralPad } from "@s2pipe/shared/types/pad";
+import { neutralPad, PAD_COUNT, type PadState, samePad, sanitizePad } from "@s2pipe/shared/types/pad";
 import type { PicoStatus } from "@s2pipe/shared/types/node";
 
 const SERIAL_BAUD = 921600;

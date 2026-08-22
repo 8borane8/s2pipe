@@ -1,4 +1,4 @@
-import { type PadState, PAD_COUNT } from "@s2pipe/shared/types/pad";
+import { PAD_COUNT, type PadState } from "@s2pipe/shared/types/pad";
 
 // Keep in sync with firmware/packet.h
 const PACKET_SIZE = 64;

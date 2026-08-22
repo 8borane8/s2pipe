@@ -78,15 +78,6 @@ case "$CAPTURE_SOURCE" in
 			audio=(-an)
 		fi
 		;;
-	custom)
-		input=( "${extra[@]}" )
-		extra=()
-		if [ -n "$CAPTURE_AUDIO" ]; then
-			audio=( "${opus[@]}" )
-		else
-			audio=(-an)
-		fi
-		;;
 	*)
 		echo "unsupported CAPTURE_SOURCE: ${CAPTURE_SOURCE}" >&2
 		exit 1

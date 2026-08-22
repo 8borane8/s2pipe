@@ -1,7 +1,7 @@
 import { Router } from "@webtools/expressapi";
 import { captureStatus } from "@/services/capture.ts";
 import { clearPad, picoStatus, setPad } from "@/services/pico.ts";
-import { addViewer, dropViewer, forEachViewer, padOf, playPad, playingCount, watchPad } from "@/services/sockets.ts";
+import { addViewer, dropViewer, forEachViewer, padOf, playingCount, playPad, watchPad } from "@/services/sockets.ts";
 import type { ClientMessage, ServerMessage } from "@s2pipe/shared/types/node";
 
 function send(ws: WebSocket, message: ServerMessage): void {
