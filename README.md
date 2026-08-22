@@ -169,7 +169,8 @@ The node opens **921600 8N1**. LED toggles on each valid packet. 250 ms silence 
 | `NODE_BASE_URL`                    | `http://localhost:5050` | URL the **browser** uses for the node              |
 | `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE address (UDP + TCP)                            |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                                   |
-| `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2 video; ALSA HDMI audio (`hw:1,0`) or silence |
+| `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2 video; ALSA HDMI audio (`hw:0,0`) or silence |
+| `CAPTURE_FORMAT`                   | `mjpeg`                 | V4L2 pixel format (`mjpeg` or `yuyv`)              |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                                        |
 | `FFMPEG_ENCODER`                   | `libx264`               | Video only: `libx264` or `h264_nvenc` (GPU overlay). Audio is always Opus on CPU |
 | `FFMPEG_EXTRA`                     | empty                   | Extra FFmpeg args                                  |
