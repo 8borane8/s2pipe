@@ -48,7 +48,7 @@ done
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
 fps="${CAPTURE_FPS}"
 opus=(-c:a libopus -application lowdelay -b:a 64k -ar 48000 -ac 2)
-rtsp_audio=(-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio)
+rtsp_audio=(-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch-audio)
 
 input=()
 video=()
@@ -127,7 +127,7 @@ cleanup() {
 trap cleanup INT TERM
 
 ffmpeg "${input[@]}" "${video[@]}" -an "${extra[@]}" \
-	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch &
+	-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch &
 ffpid=$!
 wait "$ffpid" || true
 cleanup
