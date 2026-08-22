@@ -74,7 +74,7 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
 		exit 1
 	fi
-	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -pix_fmt yuv420p)
+		video=(-c:v h264_nvenc -preset p2 -tune ull -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -pix_fmt yuv420p)
 fi
 
 case "$CAPTURE_SOURCE" in
@@ -105,4 +105,6 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch
+exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
+	-max_interleave_delta 0 \
+	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch

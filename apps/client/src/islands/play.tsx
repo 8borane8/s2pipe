@@ -97,6 +97,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}
 			handle = next;
 			whepRef.current = next;
+			next.audio.muted = muted.value;
+			next.audio.volume = volume.value;
 		}).catch(() => {
 			if (!cancelled) toast("Could not start the stream.");
 		});
@@ -217,10 +219,12 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 	useEffect(() => {
 		const video = videoRef.current;
-		if (!video) return;
-		video.muted = muted.value;
-		video.volume = volume.value;
-	}, [muted.value, volume.value]);
+		if (video) video.muted = true;
+		const audio = whepRef.current?.audio;
+		if (!audio) return;
+		audio.muted = muted.value;
+		audio.volume = volume.value;
+	}, [muted.value, volume.value, live.value]);
 
 	useEffect(() => {
 		if (!showStats.value) {
@@ -273,6 +277,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	function onStageClick(): void {
 		bumpHud();
 		void videoRef.current?.play();
+		void whepRef.current?.audio.play();
 		if (!playing.value || settings.value) return;
 		videoRef.current?.requestPointerLock().catch(() => {});
 	}

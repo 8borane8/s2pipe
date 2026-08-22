@@ -1,5 +1,6 @@
 export type WhepHandle = {
 	pc: RTCPeerConnection;
+	audio: HTMLAudioElement;
 	close: () => Promise<void>;
 };
 
@@ -28,17 +29,24 @@ export async function startWhep(
 		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 	});
 
+	const audio = new Audio();
+	audio.autoplay = true;
+
 	pc.addTransceiver("video", { direction: "recvonly" });
 	pc.addTransceiver("audio", { direction: "recvonly" });
+	video.muted = true;
 
 	pc.addEventListener("track", (event) => {
-		if (event.streams[0]) {
-			video.srcObject = event.streams[0];
+		const stream = new MediaStream([event.track]);
+		if (event.track.kind === "video") {
+			video.srcObject = stream;
+			void video.play().catch(() => {});
 			return;
 		}
-		const stream = video.srcObject instanceof MediaStream ? video.srcObject : new MediaStream();
-		stream.addTrack(event.track);
-		video.srcObject = stream;
+		if (event.track.kind === "audio") {
+			audio.srcObject = stream;
+			void audio.play().catch(() => {});
+		}
 	});
 
 	pc.addEventListener("connectionstatechange", () => {
@@ -57,6 +65,7 @@ export async function startWhep(
 
 	if (!response.ok) {
 		pc.close();
+		audio.pause();
 		throw new Error("whep");
 	}
 
@@ -66,8 +75,11 @@ export async function startWhep(
 
 	return {
 		pc,
+		audio,
 		close: async () => {
 			pc.close();
+			audio.pause();
+			audio.srcObject = null;
 			video.srcObject = null;
 			if (!location) return;
 			const resource = new URL(location, `${nodeUrl}/`).href;
