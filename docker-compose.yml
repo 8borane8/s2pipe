@@ -5,6 +5,7 @@ services:
         profiles: ["all", "node"]
         restart: unless-stopped
         init: true
+        stop_grace_period: 20s
         build:
             context: .
             dockerfile: docker/Dockerfile.media
@@ -33,6 +34,7 @@ services:
         restart: unless-stopped
         depends_on:
             - media
+        stop_grace_period: 10s
         build:
             context: .
             dockerfile: docker/Dockerfile.node

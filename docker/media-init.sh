@@ -74,7 +74,7 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
 		exit 1
 	fi
-	video=(-c:v h264_nvenc -preset p2 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize 2M -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
+	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize 2M -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
 fi
 
 case "$CAPTURE_SOURCE" in
@@ -105,6 +105,25 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
+# Do not exec: Docker SIGKILL while FFmpeg holds /dev/video0 hangs usbipd/UVC until reboot.
+ffpid=""
+cleanup() {
+	trap - INT TERM
+	if [ -n "$ffpid" ] && kill -0 "$ffpid" 2>/dev/null; then
+		kill -INT "$ffpid" 2>/dev/null || true
+		wait "$ffpid" 2>/dev/null || true
+	fi
+	if kill -0 "$pid" 2>/dev/null; then
+		kill "$pid" 2>/dev/null || true
+		wait "$pid" 2>/dev/null || true
+	fi
+}
+trap cleanup INT TERM
+
+ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
 	-max_interleave_delta 0 \
-	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch
+	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch &
+ffpid=$!
+wait "$ffpid" || true
+cleanup
+

@@ -118,6 +118,14 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile all up 
 
 Node + media only (no client container): `--profile node` instead of `--profile all`.
 
+**Stop (Windows):** do not only close the terminal. FFmpeg can keep `/dev/video0` and freeze usbipd until a reboot.
+
+```powershell
+.\scripts\stop.ps1
+```
+
+Still stuck: `.\scripts\stop.ps1 -WslShutdown` (restarts WSL, not the PC). Then attach USB again with `.\scripts\usb.ps1`.
+
 ### 3. Play
 
 Open [http://localhost:5000](http://localhost:5000). With `--profile all`, the client uses `NODE_BASE_URL` and skips the

@@ -4,9 +4,12 @@
 #
 #   .\scripts\usb.ps1 -List
 #   .\scripts\usb.ps1 -BusId 2-4
+#   .\scripts\usb.ps1 -Detach
+#   .\scripts\usb.ps1 -Detach -BusId 2-4
 
 param(
 	[switch]$List,
+	[switch]$Detach,
 	[string]$BusId
 )
 
@@ -21,8 +24,18 @@ if ($List) {
 	exit 0
 }
 
+if ($Detach) {
+	if ($BusId) {
+		usbipd detach --busid $BusId
+	} else {
+		usbipd detach --all
+	}
+	usbipd list
+	exit 0
+}
+
 if (-not $BusId) {
-	Write-Error "Usage:  .\scripts\usb.ps1 -List   or   .\scripts\usb.ps1 -BusId 2-4"
+	Write-Error "Usage:  .\scripts\usb.ps1 -List   or   .\scripts\usb.ps1 -BusId 2-4   or   .\scripts\usb.ps1 -Detach"
 }
 
 usbipd bind --busid $BusId
@@ -36,4 +49,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 usbipd list
-Write-Host "Detach later:  usbipd detach --busid $BusId"
+Write-Host "Stop stack + detach:  .\scripts\stop.ps1"
