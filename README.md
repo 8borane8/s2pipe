@@ -78,10 +78,9 @@ winget install --interactive --exact dorssel.usbipd-win
 .\scripts\usb.ps1 -BusId 2-4
 ```
 
-`usbipd list` must show **Attached**, not only Shared. The script prints `/dev/video*` and `/dev/ttyUSB*`. Serial
-adapters usually appear (`ttyUSB0` / `ttyACM0`). HDMI capture cards often do **not**: the stock WSL kernel has no UVC
-(`uvcvideo`) driver, so usbipd cannot invent `/dev/video0`. Same Compose file works on Linux. While attached, Windows
-cannot use that USB port.
+`usbipd list` must show **Attached**, not only Shared. Serial adapters usually become `/dev/ttyUSB0`. HDMI cards often
+do **not** get `/dev/video0`: the stock WSL kernel has no UVC driver. Same Compose file works on Linux. While attached,
+Windows cannot use that USB port.
 
 **Pico** (optional — without it, video works, Play does nothing on the Switch)
 
@@ -156,7 +155,6 @@ The node opens **921600 8N1**. LED toggles on each valid packet. 250 ms silence 
 | `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE address (UDP + TCP)                            |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                                   |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2 (and optional ALSA)                           |
-| `CAPTURE_FORMAT`                   | empty                   | Optional V4L2 format (`mjpeg`, `yuyv`)             |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                                        |
 | `FFMPEG_ENCODER`                   | `libx264`               | `libx264` or `h264_nvenc` (NVIDIA compose overlay) |
 | `FFMPEG_EXTRA`                     | empty                   | Extra FFmpeg args                                  |
