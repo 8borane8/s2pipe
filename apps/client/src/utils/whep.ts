@@ -12,14 +12,14 @@ export type AudioWhepHandle = {
 
 const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-function tuneAudioReceiver(receiver: RTCRtpReceiver): void {
+function tuneReceiver(receiver: RTCRtpReceiver): void {
 	try {
-		receiver.jitterBufferTarget = 40;
+		receiver.jitterBufferTarget = 0;
 	} catch {
 		// Chrome < 124
 	}
 	const legacy = receiver as RTCRtpReceiver & { playoutDelayHint?: number };
-	if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0.04;
+	if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0;
 }
 
 function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
@@ -84,6 +84,7 @@ export async function startWhep(
 
 	pc.addEventListener("track", (event) => {
 		if (event.track.kind !== "video") return;
+		if (event.receiver) tuneReceiver(event.receiver);
 		video.srcObject = new MediaStream([event.track]);
 		void video.play().catch(() => {});
 	});
@@ -109,6 +110,7 @@ export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle |
 	let ctx: AudioContext | null = null;
 	let gain: GainNode | null = null;
 	let source: MediaStreamAudioSourceNode | null = null;
+	let track: MediaStreamTrack | null = null;
 	let muted = false;
 	let volume = 1;
 
@@ -116,21 +118,30 @@ export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle |
 		if (gain) gain.gain.value = muted ? 0 : volume;
 	}
 
-	pc.addTransceiver("audio", { direction: "recvonly" });
-	pc.addEventListener("track", (event) => {
-		if (event.track.kind !== "audio") return;
-		if (event.receiver) tuneAudioReceiver(event.receiver);
-		if (!ctx || !gain) {
+	function attach(): void {
+		if (!ctx || !gain || !track) return;
+		source?.disconnect();
+		source = ctx.createMediaStreamSource(new MediaStream([track]));
+		source.connect(gain);
+		applyGain();
+	}
+
+	async function resume(): Promise<void> {
+		if (!ctx) {
 			ctx = new AudioContext({ latencyHint: "interactive" });
 			gain = ctx.createGain();
 			gain.connect(ctx.destination);
-			applyGain();
 		}
-		const graph = { ctx, gain };
-		source?.disconnect();
-		source = graph.ctx.createMediaStreamSource(new MediaStream([event.track]));
-		source.connect(graph.gain);
-		void graph.ctx.resume();
+		attach();
+		if (ctx.state !== "running") await ctx.resume();
+	}
+
+	pc.addTransceiver("audio", { direction: "recvonly" });
+	pc.addEventListener("track", (event) => {
+		if (event.track.kind !== "audio") return;
+		if (event.receiver) tuneReceiver(event.receiver);
+		track = event.track;
+		attach();
 	});
 
 	const location = await postWhep(nodeUrl, "/switch-audio/whep", pc);
@@ -146,7 +157,7 @@ export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle |
 			volume = next;
 			applyGain();
 		},
-		resume: () => ctx?.resume() ?? Promise.resolve(),
+		resume,
 		close: async () => {
 			source?.disconnect();
 			await ctx?.close().catch(() => {});

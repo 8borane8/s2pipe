@@ -270,11 +270,16 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		};
 	}, []);
 
+	function unlockAudio(): void {
+		void audioRef.current?.resume();
+	}
+
 	function play(): void {
 		if (playing.value) return;
 		if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 		playRequested.current = true;
 		send(wsRef.current, { op: "play" });
+		unlockAudio();
 		bumpHud();
 	}
 
@@ -289,7 +294,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	function onStageClick(): void {
 		bumpHud();
 		void videoRef.current?.play();
-		void audioRef.current?.resume();
+		unlockAudio();
 		if (!playing.value || settings.value) return;
 		videoRef.current?.requestPointerLock().catch(() => {});
 	}
@@ -324,6 +329,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			<video
 				ref={videoRef}
 				autoplay
+				muted
 				playsInline
 				onPlaying={() => {
 					live.value = true;
@@ -404,7 +410,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							type="button"
 							class="btn btn-icon"
 							aria-label={muted.value ? "Unmute" : "Mute"}
-							onClick={() => muted.value = !muted.value}
+							onClick={() => {
+								muted.value = !muted.value;
+								unlockAudio();
+							}}
 						>
 							{muted.value ? <VolumeX size={16} /> : <Volume2 size={16} />}
 						</button>
@@ -464,6 +473,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							onInput={(event) => {
 								volume.value = Number((event.target as HTMLInputElement).value);
 								if (volume.value > 0) muted.value = false;
+								unlockAudio();
 							}}
 						/>
 					</label>

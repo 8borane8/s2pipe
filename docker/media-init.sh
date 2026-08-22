@@ -49,7 +49,8 @@ done
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
 fps="${CAPTURE_FPS}"
 opus=(-c:a libopus -application lowdelay -compression_level 0 -frame_duration 10 -b:a 64k -ar 48000 -ac 2)
-rtsp_audio=( -max_delay 0 -muxdelay 0 -muxpreload 0 -flush_packets 1 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio )
+rtsp_live=(-max_delay 0 -muxdelay 0 -muxpreload 0 -flush_packets 1 -f rtsp -rtsp_transport tcp)
+rtsp_audio=( "${rtsp_live[@]}" rtsp://127.0.0.1:8554/switch-audio )
 
 input=()
 video=()
@@ -61,7 +62,9 @@ if [ -n "$FFMPEG_EXTRA" ]; then
 	extra=( $FFMPEG_EXTRA )
 fi
 
-video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" -pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
+video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" \
+	-pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 1M \
+	-x264-params sliced-threads=1:sync-lookahead=0:rc-lookahead=0)
 if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 	nvenc=""
 	for f in /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 \
@@ -77,7 +80,7 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
 		exit 1
 	fi
-	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize 2M -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
+	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -delay 0 -rc-lookahead 0 -pix_fmt yuv420p)
 fi
 
 case "$CAPTURE_SOURCE" in
@@ -128,7 +131,7 @@ cleanup() {
 trap cleanup INT TERM
 
 ffmpeg "${input[@]}" "${video[@]}" -an "${extra[@]}" \
-	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch &
+	-fps_mode passthrough "${rtsp_live[@]}" rtsp://127.0.0.1:8554/switch &
 ffpid=$!
 wait "$ffpid" || true
 cleanup
