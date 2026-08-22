@@ -44,7 +44,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const idleTimer = useRef<ReturnType<typeof setTimeout> | 0>(0);
 	const toastSeq = useRef(0);
 	const playRequested = useRef(false);
-	const audioUnlock = useRef(false);
 
 	const playing = useSignal(false);
 	const playingCount = useSignal(0);
@@ -112,9 +111,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}
 			audioHandle = next;
 			audioRef.current = next;
-			next.setMuted(muted.value);
-			next.setVolume(volume.value);
-			if (audioUnlock.current) void next.resume();
+			next.audio.muted = muted.value;
+			next.audio.volume = volume.value;
 		}).catch(() => {});
 
 		return () => {
@@ -236,8 +234,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	useEffect(() => {
 		const video = videoRef.current;
 		if (video) video.muted = true;
-		audioRef.current?.setMuted(muted.value);
-		audioRef.current?.setVolume(volume.value);
+		const audio = audioRef.current?.audio;
+		if (!audio) return;
+		audio.muted = muted.value;
+		audio.volume = volume.value;
 	}, [muted.value, volume.value, live.value]);
 
 	useEffect(() => {
@@ -272,17 +272,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		};
 	}, []);
 
-	function unlockAudio(): void {
-		audioUnlock.current = true;
-		void audioRef.current?.resume();
-	}
-
 	function play(): void {
 		if (playing.value) return;
 		if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 		playRequested.current = true;
 		send(wsRef.current, { op: "play" });
-		unlockAudio();
 		bumpHud();
 	}
 
@@ -297,7 +291,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	function onStageClick(): void {
 		bumpHud();
 		void videoRef.current?.play();
-		unlockAudio();
+		void audioRef.current?.audio.play();
 		if (!playing.value || settings.value) return;
 		videoRef.current?.requestPointerLock().catch(() => {});
 	}
@@ -413,10 +407,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							type="button"
 							class="btn btn-icon"
 							aria-label={muted.value ? "Unmute" : "Mute"}
-							onClick={() => {
-								muted.value = !muted.value;
-								unlockAudio();
-							}}
+							onClick={() => muted.value = !muted.value}
 						>
 							{muted.value ? <VolumeX size={16} /> : <Volume2 size={16} />}
 						</button>
@@ -476,7 +467,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							onInput={(event) => {
 								volume.value = Number((event.target as HTMLInputElement).value);
 								if (volume.value > 0) muted.value = false;
-								unlockAudio();
 							}}
 						/>
 					</label>
