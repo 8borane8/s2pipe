@@ -178,6 +178,7 @@ The node opens **921600 8N1**. LED toggles on each valid packet. 250 ms silence 
 | `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE address (UDP + TCP)                            |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                                   |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2 video; ALSA HDMI audio (`hw:0,0`) or silence |
+| `CAPTURE_FORMAT`                   | `mjpeg`                 | V4L2 pixel format (`yuyv` if the card has no MJPEG) |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                                        |
 | `FFMPEG_ENCODER`                   | `libx264`               | `libx264` or `h264_nvenc` (NVIDIA compose overlay) |
 | `FFMPEG_EXTRA`                     | empty                   | Extra FFmpeg args                                  |
@@ -228,7 +229,8 @@ Set it to lock the node URL.
 | ------------------- | ------------------------------------------------------ |
 | `GET /health`       | Capture, Pico, `playing` count                         |
 | `GET /socket`       | WebSocket                                              |
-| `POST /switch/whep` | WHEP offer; `PATCH` / `DELETE` `/switch/whep/:session` |
+| `POST /switch/whep`       | Video WHEP; `PATCH` / `DELETE` `/switch/whep/:session`       |
+| `POST /switch-audio/whep` | Audio WHEP; `PATCH` / `DELETE` `/switch-audio/whep/:session` |
 
 - Client: `{ op: "play" }` · `{ op: "watch" }` · `{ op: "pad", data: PadState }`
 - Server: `{ op: "status", data: { capture, pico, playing } }` on join and when seats change

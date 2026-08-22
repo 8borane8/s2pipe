@@ -48,8 +48,8 @@ done
 
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
 fps="${CAPTURE_FPS}"
-opus=(-c:a libopus -application lowdelay -compression_level 0 -b:a 64k -ar 48000 -ac 2)
-rtsp_audio=( -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio )
+opus=(-c:a libopus -application lowdelay -compression_level 0 -frame_duration 10 -b:a 64k -ar 48000 -ac 2)
+rtsp_audio=( -max_delay 0 -muxdelay 0 -muxpreload 0 -flush_packets 1 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio )
 
 input=()
 video=()
@@ -97,7 +97,9 @@ case "$CAPTURE_SOURCE" in
 		fmt="${CAPTURE_FORMAT:-mjpeg}"
 		input=(-f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
 		if [ -n "$CAPTURE_AUDIO" ]; then
-			ffmpeg -f alsa -i "$CAPTURE_AUDIO" "${opus[@]}" "${rtsp_audio[@]}" &
+			# USB HDMI ALSA PTS jumps; wallclock + async (no first_pts).
+			ffmpeg -use_wallclock_as_timestamps 1 -f alsa -ac 2 -ar 48000 -i "$CAPTURE_AUDIO" \
+				-af aresample=async=1 "${opus[@]}" "${rtsp_audio[@]}" &
 			apid=$!
 		fi
 		;;

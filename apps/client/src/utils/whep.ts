@@ -4,11 +4,23 @@ export type WhepHandle = {
 };
 
 export type AudioWhepHandle = {
-	audio: HTMLAudioElement;
+	setMuted: (muted: boolean) => void;
+	setVolume: (volume: number) => void;
+	resume: () => Promise<void>;
 	close: () => Promise<void>;
 };
 
 const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+function tuneAudioReceiver(receiver: RTCRtpReceiver): void {
+	try {
+		receiver.jitterBufferTarget = 40;
+	} catch {
+		// Chrome < 124
+	}
+	const legacy = receiver as RTCRtpReceiver & { playoutDelayHint?: number };
+	if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0.04;
+}
 
 function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 	if (pc.iceGatheringState === "complete") return Promise.resolve();
@@ -94,27 +106,50 @@ export async function startWhep(
 
 export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle | null> {
 	const pc = new RTCPeerConnection(ice);
-	const audio = new Audio();
-	audio.autoplay = true;
+	let ctx: AudioContext | null = null;
+	let gain: GainNode | null = null;
+	let source: MediaStreamAudioSourceNode | null = null;
+	let muted = false;
+	let volume = 1;
+
+	function applyGain(): void {
+		if (gain) gain.gain.value = muted ? 0 : volume;
+	}
+
 	pc.addTransceiver("audio", { direction: "recvonly" });
 	pc.addEventListener("track", (event) => {
 		if (event.track.kind !== "audio") return;
-		audio.srcObject = new MediaStream([event.track]);
-		void audio.play().catch(() => {});
+		if (event.receiver) tuneAudioReceiver(event.receiver);
+		if (!ctx || !gain) {
+			ctx = new AudioContext({ latencyHint: "interactive" });
+			gain = ctx.createGain();
+			gain.connect(ctx.destination);
+			applyGain();
+		}
+		const graph = { ctx, gain };
+		source?.disconnect();
+		source = graph.ctx.createMediaStreamSource(new MediaStream([event.track]));
+		source.connect(graph.gain);
+		void graph.ctx.resume();
 	});
 
 	const location = await postWhep(nodeUrl, "/switch-audio/whep", pc);
-	if (!pc.remoteDescription) {
-		audio.pause();
-		return null;
-	}
+	if (!pc.remoteDescription) return null;
 
 	const close = closeWhep(pc, nodeUrl, location);
 	return {
-		audio,
+		setMuted: (next) => {
+			muted = next;
+			applyGain();
+		},
+		setVolume: (next) => {
+			volume = next;
+			applyGain();
+		},
+		resume: () => ctx?.resume() ?? Promise.resolve(),
 		close: async () => {
-			audio.pause();
-			audio.srcObject = null;
+			source?.disconnect();
+			await ctx?.close().catch(() => {});
 			await close();
 		},
 	};

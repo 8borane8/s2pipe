@@ -111,8 +111,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			}
 			audioHandle = next;
 			audioRef.current = next;
-			next.audio.muted = muted.value;
-			next.audio.volume = volume.value;
+			next.setMuted(muted.value);
+			next.setVolume(volume.value);
 		}).catch(() => {});
 
 		return () => {
@@ -234,10 +234,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	useEffect(() => {
 		const video = videoRef.current;
 		if (video) video.muted = true;
-		const audio = audioRef.current?.audio;
-		if (!audio) return;
-		audio.muted = muted.value;
-		audio.volume = volume.value;
+		audioRef.current?.setMuted(muted.value);
+		audioRef.current?.setVolume(volume.value);
 	}, [muted.value, volume.value, live.value]);
 
 	useEffect(() => {
@@ -291,7 +289,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	function onStageClick(): void {
 		bumpHud();
 		void videoRef.current?.play();
-		void audioRef.current?.audio?.play();
+		void audioRef.current?.resume();
 		if (!playing.value || settings.value) return;
 		videoRef.current?.requestPointerLock().catch(() => {});
 	}
