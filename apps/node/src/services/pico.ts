@@ -5,7 +5,7 @@ import { neutralPad, PAD_COUNT, type PadState, samePad, sanitizePad } from "@s2p
 import type { PicoStatus } from "@s2pipe/shared/types/node";
 
 const SERIAL_BAUD = 921600;
-const FLUSH_MS = 8;
+const FLUSH_MS = 4;
 const KEEPALIVE_TICKS = 12;
 
 const pads: PadState[] = Array.from({ length: PAD_COUNT }, () => neutralPad());

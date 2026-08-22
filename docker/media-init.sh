@@ -17,6 +17,7 @@ webrtcLocalTCPAddress: :${MEDIA_ICE_PORT}
 webrtcIPsFromInterfaces: no
 webrtcAdditionalHosts: ["${MEDIA_ICE_IP}"]
 webrtcTrackGatherTimeout: 100ms
+rtspTransports: [tcp]
 rtmp: false
 srt: false
 playback: false
@@ -47,7 +48,7 @@ done
 
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
 fps="${CAPTURE_FPS}"
-opus=(-c:a libopus -application lowdelay -b:a 96k -ar 48000 -ac 2)
+opus=(-c:a libopus -application lowdelay -frame_duration 10 -b:a 96k -ar 48000 -ac 2)
 
 input=()
 video=()
@@ -74,11 +75,11 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
 		exit 1
 	fi
-	# llhq already low-latency; without bufsize FFmpeg sets 2× bitrate (~2s at 8M).
-	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -bufsize 2M -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
+	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -bufsize 250k \
+		-g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
 else
 	video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" \
-		-pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
+		-pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 1M)
 fi
 
 case "$CAPTURE_SOURCE" in
@@ -95,9 +96,10 @@ case "$CAPTURE_SOURCE" in
 		# Uncompressed YUY2 1080p60 is ~2 Gb/s; USB (and usbipd) drops frames.
 		# UVC HDMI dongles speak MJPEG. Override with CAPTURE_FORMAT=yuyv if needed.
 		fmt="${CAPTURE_FORMAT:-mjpeg}"
-		input=(-f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
+		live=(-fflags nobuffer -flags low_delay)
+		input=("${live[@]}" -f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
 		if [ -n "$CAPTURE_AUDIO" ]; then
-			input+=(-f alsa -i "$CAPTURE_AUDIO")
+			input+=("${live[@]}" -f alsa -i "$CAPTURE_AUDIO")
 			audio=( "${opus[@]}" )
 		else
 			audio=(-an)
@@ -109,4 +111,6 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch
+exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
+	-max_interleave_delta 0 -muxdelay 0 -muxpreload 0 -flush_packets 1 \
+	-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch

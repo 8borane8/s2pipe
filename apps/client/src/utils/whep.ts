@@ -14,7 +14,7 @@ function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 		const onChange = () => {
 			if (pc.iceGatheringState === "complete") done();
 		};
-		const timer = setTimeout(done, 2000);
+		const timer = setTimeout(done, 500);
 		pc.addEventListener("icegatheringstatechange", onChange);
 	});
 }
