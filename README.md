@@ -66,18 +66,22 @@ The card must appear as a webcam. Some Game Capture boxes with Windows-only driv
 
 - **Linux:** plug the card in. Compose already maps the host `/dev` into media and node (`privileged`). If it is not
   `video0`, set `CAPTURE_DEVICE` to `/dev/videoN`.
-- **Windows:** Docker Desktop cannot see USB. Attach the card to WSL first
-  ([usbipd-win](https://learn.microsoft.com/windows/wsl/connect-usb)):
+- **Windows:** Docker Desktop cannot see USB by itself. `bind` only shares the device; you still need **attach**. Attach
+  must use a **real WSL distro** (Ubuntu). `docker-desktop` has no usbip client — do not pass
+  `--distribution docker-desktop`.
 
 ```powershell
 wsl --update
+wsl --install -d Ubuntu
 winget install --interactive --exact dorssel.usbipd-win
 .\scripts\usb.ps1 -List
 .\scripts\usb.ps1 -BusId 2-4
 ```
 
-Administrator PowerShell the first time. While attached, Windows cannot use that USB port. If Compose was already
-running: `docker compose --profile all restart media`.
+`usbipd list` must show **Attached**, not only Shared. The script prints `/dev/video*` and `/dev/ttyUSB*`. Serial
+adapters usually appear (`ttyUSB0` / `ttyACM0`). HDMI capture cards often do **not**: the stock WSL kernel has no UVC
+(`uvcvideo`) driver, so usbipd cannot invent `/dev/video0`. Same Compose file works on Linux. While attached, Windows
+cannot use that USB port.
 
 **Pico** (optional — without it, video works, Play does nothing on the Switch)
 
@@ -152,6 +156,7 @@ The node opens **921600 8N1**. LED toggles on each valid packet. 250 ms silence 
 | `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE address (UDP + TCP)                            |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                                   |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2 (and optional ALSA)                           |
+| `CAPTURE_FORMAT`                   | empty                   | Optional V4L2 format (`mjpeg`, `yuyv`)             |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                                        |
 | `FFMPEG_ENCODER`                   | `libx264`               | `libx264` or `h264_nvenc` (NVIDIA compose overlay) |
 | `FFMPEG_EXTRA`                     | empty                   | Extra FFmpeg args                                  |

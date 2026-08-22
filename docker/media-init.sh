@@ -59,7 +59,7 @@ if [ -n "$FFMPEG_EXTRA" ]; then
 fi
 
 if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
-	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -pix_fmt yuv420p)
+	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
 else
 	video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" -pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
 fi
@@ -70,9 +70,43 @@ case "$CAPTURE_SOURCE" in
 		audio=( "${opus[@]}" )
 		;;
 	v4l2)
-		input=(-f v4l2 -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
+		modprobe uvcvideo 2>/dev/null || true
+		i=0
+		while [ ! -e "$CAPTURE_DEVICE" ]; do
+			i=$((i + 1))
+			if [ "$i" -gt 20 ]; then
+				found=""
+				for p in /dev/video0 /dev/video1 /dev/video2 /dev/video3 \
+					/run/desktop/dev/video0 /run/desktop/dev/video1 /run/desktop/dev/video2; do
+					if [ -e "$p" ]; then
+						found=$p
+						break
+					fi
+				done
+				if [ -n "$found" ]; then
+					echo "CAPTURE_DEVICE=${CAPTURE_DEVICE} missing, using ${found}" >&2
+					CAPTURE_DEVICE=$found
+					break
+				fi
+				echo "No capture device at ${CAPTURE_DEVICE}." >&2
+				echo "video nodes:" >&2
+				ls -l /dev/video* /run/desktop/dev/video* 2>/dev/null || echo "(none)" >&2
+				echo "On Windows: bind is not enough — run  .\\scripts\\usb.ps1 -BusId …  (Ubuntu, not docker-desktop) and check Attached." >&2
+				echo "If lsusb sees the card but there is no /dev/video*, WSL has no UVC driver." >&2
+				exit 1
+			fi
+			echo "waiting for ${CAPTURE_DEVICE} (${i}/20)" >&2
+			modprobe uvcvideo 2>/dev/null || true
+			sleep 1
+		done
+		echo "capture device: ${CAPTURE_DEVICE}"
+		input=(-f v4l2 -thread_queue_size 512 -framerate "$fps" -video_size "$size")
+		if [ -n "${CAPTURE_FORMAT:-}" ]; then
+			input+=(-input_format "$CAPTURE_FORMAT")
+		fi
+		input+=(-i "$CAPTURE_DEVICE")
 		if [ -n "$CAPTURE_AUDIO" ]; then
-			input+=(-f alsa -i "$CAPTURE_AUDIO")
+			input+=(-f alsa -thread_queue_size 512 -i "$CAPTURE_AUDIO")
 			audio=( "${opus[@]}" )
 		else
 			audio=(-an)
@@ -84,4 +118,6 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch
+exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
+	-fflags flush_packets -f rtsp -rtsp_transport tcp -muxdelay 0 -muxpreload 0 \
+	rtsp://127.0.0.1:8554/switch
