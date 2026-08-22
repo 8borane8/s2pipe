@@ -80,7 +80,7 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
 		exit 1
 	fi
-	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -delay 0 -rc-lookahead 0 -pix_fmt yuv420p)
+	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize 1M -g "$fps" -bf 0 -delay 0 -rc-lookahead 0 -pix_fmt yuv420p)
 fi
 
 case "$CAPTURE_SOURCE" in

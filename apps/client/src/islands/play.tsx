@@ -44,6 +44,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const idleTimer = useRef<ReturnType<typeof setTimeout> | 0>(0);
 	const toastSeq = useRef(0);
 	const playRequested = useRef(false);
+	const audioUnlock = useRef(false);
 
 	const playing = useSignal(false);
 	const playingCount = useSignal(0);
@@ -113,6 +114,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			audioRef.current = next;
 			next.setMuted(muted.value);
 			next.setVolume(volume.value);
+			if (audioUnlock.current) void next.resume();
 		}).catch(() => {});
 
 		return () => {
@@ -271,6 +273,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}, []);
 
 	function unlockAudio(): void {
+		audioUnlock.current = true;
 		void audioRef.current?.resume();
 	}
 

@@ -14,12 +14,12 @@ const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 function tuneReceiver(receiver: RTCRtpReceiver): void {
 	try {
-		receiver.jitterBufferTarget = 0;
+		receiver.jitterBufferTarget = 16;
 	} catch {
 		// Chrome < 124
 	}
 	const legacy = receiver as RTCRtpReceiver & { playoutDelayHint?: number };
-	if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0;
+	if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0.016;
 }
 
 function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
