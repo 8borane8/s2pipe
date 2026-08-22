@@ -77,7 +77,9 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
 		exit 1
 	fi
-	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -delay 0 -zerolatency 1 -pix_fmt yuv420p)
+	# NVIDIA ULL: 1-frame VBV. FFmpeg -delay 0 drains the default NVENC async queue (~4 frames).
+	buf=$((8000000 / fps))
+	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize "$buf" -g "$fps" -bf 0 -delay 0 -zerolatency 1 -pix_fmt yuv420p)
 fi
 
 case "$CAPTURE_SOURCE" in
