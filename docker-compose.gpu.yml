@@ -2,4 +2,5 @@ services:
     media:
         environment:
             FFMPEG_ENCODER: h264_nvenc
+            NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
         gpus: all

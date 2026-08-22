@@ -5,7 +5,7 @@ Self-hosted cloud gaming for a Nintendo Switch 2 at home.
 The console stays on the capture PC. Up to four people open a browser, see the picture over WebRTC, and play with a
 gamepad or keyboard and mouse. Inputs go to a Raspberry Pico that shows up on the Switch as USB controllers.
 
-No cloud, no subscription, no client install. **No authentication** — trusted LAN only. Do not put this on the Internet.
+No cloud, no subscription, no client install. **No authentication**. Trusted LAN only. Do not put this on the Internet.
 
 ## How it works
 
@@ -44,9 +44,9 @@ cp .env.example .env
 
 Edit `.env`. Compose reads this file.
 
-**This PC only** — leave the defaults (`localhost`).
+**This PC only:** leave the defaults (`localhost`).
 
-**Other machines on the LAN** — use the capture PC’s IP, never `127.0.0.1` and never the Docker name `node`:
+**Other machines on the LAN:** use the capture PC’s IP, never `127.0.0.1` and never the Docker name `node`:
 
 ```
 NODE_BASE_URL=http://192.168.1.20:5050
@@ -67,7 +67,7 @@ The card must appear as a webcam. Some Game Capture boxes with Windows-only driv
 - **Linux:** plug the card in. Compose already maps the host `/dev` into media and node (`privileged`). If it is not
   `video0`, set `CAPTURE_DEVICE` to `/dev/videoN`.
 - **Windows:** Docker Desktop cannot see USB by itself. `bind` only shares the device; you still need **attach**. Attach
-  must use a **real WSL distro** (Ubuntu). `docker-desktop` has no usbip client — do not pass
+  must use a **real WSL distro** (Ubuntu). `docker-desktop` has no usbip client. Do not pass
   `--distribution docker-desktop`.
 
 ```powershell
@@ -82,10 +82,10 @@ winget install --interactive --exact dorssel.usbipd-win
 do **not** get `/dev/video0`: the stock WSL kernel has no UVC driver. Same Compose file works on Linux. While attached,
 Windows cannot use that USB port.
 
-**Pico** (optional — without it, video works, Play does nothing on the Switch)
+**Pico** (optional: without it, video works, Play does nothing on the Switch)
 
 `PICO_SERIAL=/dev/ttyUSB0` in Compose (Linux **and** Windows). On Windows attach the UART adapter with
-`.\scripts\usb.ps1` too — not `COM3`, the node is Linux. Wiring and flash: [Pico](#pico).
+`.\scripts\usb.ps1` too, not `COM3`, the node is Linux. Wiring and flash: [Pico](#pico).
 
 ### 2. Start
 
@@ -95,7 +95,10 @@ CPU:
 docker compose --profile all up --build
 ```
 
-NVIDIA (`h264_nvenc`):
+NVIDIA (`h264_nvenc`), Windows or Linux. Needs an NVIDIA GPU and Docker GPU access (Linux:
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/index.html);
+Windows: Docker Desktop WSL2 + current Game Ready / Studio driver). The driver stays on the host; Compose injects
+NVENC into the container.
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile all up --build
@@ -187,16 +190,16 @@ deno check apps/node/src/index.ts
 deno check apps/client/src/index.ts
 ```
 
-**Media** — keep Compose. WHEP (`8889`) is not published. A host node needs `8889:8889` on media, or MediaMTX on the
+**Media:** keep Compose. WHEP (`8889`) is not published. A host node needs `8889:8889` on media, or MediaMTX on the
 machine (`MEDIA_HOST`, default `127.0.0.1`).
 
-**Node** — `cd apps/node && cp .env.example .env && deno task dev` (port 5050). `PICO_SERIAL`: `COM3` on Windows host,
+**Node:** `cd apps/node && cp .env.example .env && deno task dev` (port 5050). `PICO_SERIAL`: `COM3` on Windows host,
 `/dev/ttyUSB0` on Linux host.
 
-**Client** — `cd apps/client && cp .env.example .env && deno task dev` (port 5000). No `NODE_BASE_URL` → connect page.
+**Client:** `cd apps/client && cp .env.example .env && deno task dev` (port 5000). No `NODE_BASE_URL` → connect page.
 Set it to lock the node URL.
 
-**Firmware** — [firmware/README.md](firmware/README.md). Keep `apps/node/src/utils/packet.ts` in sync with
+**Firmware:** [firmware/README.md](firmware/README.md). Keep `apps/node/src/utils/packet.ts` in sync with
 `firmware/packet.h`.
 
 ## Node API

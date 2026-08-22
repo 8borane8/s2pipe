@@ -1,5 +1,5 @@
 # Bind + attach a USB device to WSL so Docker can see it. Bind is not enough.
-# Do not attach to docker-desktop — use Ubuntu (or any real distro).
+# Do not attach to docker-desktop: use Ubuntu (or any real distro).
 # https://learn.microsoft.com/windows/wsl/connect-usb
 #
 #   .\scripts\usb.ps1 -List

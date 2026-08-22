@@ -58,10 +58,23 @@ if [ -n "$FFMPEG_EXTRA" ]; then
 	extra=( $FFMPEG_EXTRA )
 fi
 
+video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" -pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
 if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
-	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -pix_fmt yuv420p)
-else
-	video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" -pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
+	nvenc=""
+	for f in /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 \
+		/usr/lib/wsl/lib/libnvidia-encode.so.1 \
+		/usr/local/nvidia/lib64/libnvidia-encode.so.1; do
+		if [ -e "$f" ]; then
+			nvenc=$f
+			export LD_LIBRARY_PATH="$(dirname "$f")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+			break
+		fi
+	done
+	if [ -n "$nvenc" ]; then
+		video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -pix_fmt yuv420p)
+	else
+		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing; using libx264" >&2
+	fi
 fi
 
 case "$CAPTURE_SOURCE" in
@@ -75,7 +88,10 @@ case "$CAPTURE_SOURCE" in
 			ls -l /dev/video* 2>/dev/null || echo "(no /dev/video*)" >&2
 			exit 1
 		fi
-		input=(-f v4l2 -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
+		# Uncompressed YUY2 1080p60 is ~2 Gb/s; USB (and usbipd) drops frames.
+		# UVC HDMI dongles speak MJPEG. Override with CAPTURE_FORMAT=yuyv if needed.
+		fmt="${CAPTURE_FORMAT:-mjpeg}"
+		input=(-f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
 		if [ -n "$CAPTURE_AUDIO" ]; then
 			input+=(-f alsa -i "$CAPTURE_AUDIO")
 			audio=( "${opus[@]}" )
