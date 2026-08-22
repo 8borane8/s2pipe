@@ -58,7 +58,6 @@ if [ -n "$FFMPEG_EXTRA" ]; then
 	extra=( $FFMPEG_EXTRA )
 fi
 
-video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" -pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
 if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 	nvenc=""
 	for f in /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 \
@@ -70,11 +69,15 @@ if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
 			break
 		fi
 	done
-	if [ -n "$nvenc" ]; then
-		video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -pix_fmt yuv420p)
-	else
-		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing; using libx264" >&2
+	if [ -z "$nvenc" ]; then
+		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
+		exit 1
 	fi
+	video=(-c:v h264_nvenc -preset llhq -tune ll -rc cbr -b:v 8M -maxrate 8M -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
+else
+	video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" \
+		-pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 1M \
+		-x264-params sliced-threads=1:sync-lookahead=0:rc-lookahead=0)
 fi
 
 case "$CAPTURE_SOURCE" in
@@ -105,4 +108,8 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-exec ffmpeg "${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch
+exec ffmpeg \
+	-fflags nobuffer+flush_packets+discardcorrupt -flags low_delay -probesize 32 -analyzeduration 0 \
+	"${input[@]}" "${video[@]}" "${audio[@]}" "${extra[@]}" \
+	-max_delay 0 -muxdelay 0 -muxpreload 0 \
+	-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch

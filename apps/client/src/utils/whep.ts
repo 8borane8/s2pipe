@@ -19,6 +19,20 @@ function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 	});
 }
 
+function preferLowLatency(pc: RTCPeerConnection): void {
+	for (const receiver of pc.getReceivers()) {
+		const kind = receiver.track.kind;
+		if (kind !== "audio" && kind !== "video") continue;
+		try {
+			receiver.jitterBufferTarget = 0;
+		} catch {
+			// Chrome < 124
+		}
+		const legacy = receiver as RTCRtpReceiver & { playoutDelayHint?: number };
+		if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0;
+	}
+}
+
 export async function startWhep(
 	nodeUrl: string,
 	video: HTMLVideoElement,
@@ -30,8 +44,10 @@ export async function startWhep(
 
 	pc.addTransceiver("video", { direction: "recvonly" });
 	pc.addTransceiver("audio", { direction: "recvonly" });
+	preferLowLatency(pc);
 
 	pc.addEventListener("track", (event) => {
+		preferLowLatency(pc);
 		if (event.streams[0]) {
 			video.srcObject = event.streams[0];
 			return;
