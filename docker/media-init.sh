@@ -13,7 +13,6 @@ webrtcAddress: :8889
 webrtcEncryption: no
 webrtcAllowOrigin: '*'
 webrtcLocalUDPAddress: :${MEDIA_ICE_PORT}
-webrtcLocalTCPAddress: :${MEDIA_ICE_PORT}
 webrtcIPsFromInterfaces: no
 webrtcAdditionalHosts: ["${MEDIA_ICE_IP}"]
 rtmp: false

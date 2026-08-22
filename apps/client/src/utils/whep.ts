@@ -10,6 +10,16 @@ export type AudioWhepHandle = {
 
 const ice = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
+function preferLowJitter(receiver: RTCRtpReceiver): void {
+	try {
+		// Hint in ms. Chrome clamps; 50 would *add* delay. 0 is invalid (must be > 0).
+		receiver.jitterBufferTarget = 1;
+	} catch {
+		const legacy = receiver as RTCRtpReceiver & { playoutDelayHint?: number };
+		if ("playoutDelayHint" in legacy) legacy.playoutDelayHint = 0.001;
+	}
+}
+
 function waitIceGathering(pc: RTCPeerConnection): Promise<void> {
 	if (pc.iceGatheringState === "complete") return Promise.resolve();
 	return new Promise((resolve) => {
@@ -72,6 +82,7 @@ export async function startWhep(
 
 	pc.addEventListener("track", (event) => {
 		if (event.track.kind !== "video") return;
+		if (event.receiver) preferLowJitter(event.receiver);
 		video.srcObject = new MediaStream([event.track]);
 		void video.play().catch(() => {});
 	});
@@ -99,6 +110,7 @@ export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle |
 	pc.addTransceiver("audio", { direction: "recvonly" });
 	pc.addEventListener("track", (event) => {
 		if (event.track.kind !== "audio") return;
+		if (event.receiver) preferLowJitter(event.receiver);
 		audio.srcObject = new MediaStream([event.track]);
 		void audio.play().catch(() => {});
 	});

@@ -53,7 +53,7 @@ NODE_BASE_URL=http://192.168.1.20:5050
 MEDIA_ICE_IP=192.168.1.20
 ```
 
-The browser must reach both `NODE_BASE_URL` and `MEDIA_ICE_IP:MEDIA_ICE_PORT` (UDP and TCP).
+The browser must reach both `NODE_BASE_URL` and `MEDIA_ICE_IP:MEDIA_ICE_PORT` (UDP).
 
 **Video**
 
@@ -175,7 +175,7 @@ The node opens **921600 8N1**. LED toggles on each valid packet. 250 ms silence 
 | ---------------------------------- | ----------------------- | -------------------------------------------------- |
 | `NODE_PORT`                        | `5050`                  | Node HTTP                                          |
 | `NODE_BASE_URL`                    | `http://localhost:5050` | URL the **browser** uses for the node              |
-| `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE address (UDP + TCP)                            |
+| `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE address (UDP)                                  |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                                   |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2 video; ALSA HDMI audio (`hw:0,0`) or silence |
 | `CAPTURE_FORMAT`                   | `mjpeg`                 | V4L2 pixel format (`yuyv` if the card has no MJPEG) |
@@ -189,7 +189,7 @@ The node opens **921600 8N1**. LED toggles on each valid packet. 250 ms silence 
 | ------------ | ----------------------------------- |
 | 5000         | Client                              |
 | 5050         | Node: health, WebSocket, WHEP proxy |
-| 8189 UDP+TCP | WebRTC ICE / RTP                    |
+| 8189 UDP      | WebRTC ICE / RTP                    |
 
 ## Development
 
