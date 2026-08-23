@@ -11,7 +11,12 @@
 #endif
 
 #include "packet.h"
-#include "usb.h"
+
+#include <string.h>
+
+#if CFG_TUD_HID != PAD_COUNT
+#error "CFG_TUD_HID must match PAD_COUNT"
+#endif
 
 #define UART_ID uart1
 #define UART_IRQ UART1_IRQ
@@ -35,13 +40,10 @@ typedef struct TU_ATTR_PACKED {
 	uint8_t vendor;
 } hid_report_t;
 
+_Static_assert(sizeof(hid_report_t) == 8, "HORI input report is 8 bytes");
+
 static pad_state_t pads[PAD_COUNT];
 static uint32_t last_packet_ms;
-static uint8_t live_count;
-
-static uint8_t rx_buf[256];
-static volatile uint8_t rx_head;
-static volatile uint8_t rx_tail;
 
 static uint8_t hat_from(uint32_t buttons) {
 	int up = (buttons & BTN_UP) != 0;
@@ -69,6 +71,10 @@ static void fill_report(pad_state_t const *pad, hid_report_t *report) {
 	report->vendor = 0;
 }
 
+static uint8_t rx_buf[256];
+static volatile uint8_t rx_head;
+static volatile uint8_t rx_tail;
+
 static void on_uart_rx(void) {
 	while (uart_is_readable(UART_ID)) {
 		uint8_t next = (uint8_t)(rx_head + 1);
@@ -79,59 +85,31 @@ static void on_uart_rx(void) {
 	}
 }
 
-static uint8_t popcount4(uint8_t value) {
-	value &= 0x0f;
-	return (uint8_t)((value & 1) + ((value >> 1) & 1) + ((value >> 2) & 1) + ((value >> 3) & 1));
-}
-
-static uint8_t slot_of_hid(uint8_t hid) {
-	uint8_t n = 0;
-	uint8_t flags = packet_flags();
-	for (uint8_t slot = 0; slot < PAD_COUNT; slot++) {
-		if (!(flags & (1u << slot))) continue;
-		if (n == hid) return slot;
-		n++;
-	}
-	return 0xff;
-}
-
-static void apply_pad_count(uint8_t flags) {
-	uint8_t n = popcount4(flags);
-	if (n == live_count) return;
-	live_count = n;
-	usb_set_hid_count(n);
-	tud_disconnect();
-	sleep_ms(80);
-	if (n) tud_connect();
-}
-
 static void uart_drain(void) {
 	while (rx_tail != rx_head) {
 		uint8_t byte = rx_buf[rx_tail];
 		rx_tail = (uint8_t)(rx_tail + 1);
 		if (!packet_push(byte, pads)) continue;
 		last_packet_ms = to_ms_since_boot(get_absolute_time());
-		apply_pad_count(packet_flags());
-#ifdef PICO_DEFAULT_LED_PIN
-		gpio_xor_mask(1u << PICO_DEFAULT_LED_PIN);
-#endif
+		if (last_packet_ms == 0) last_packet_ms = 1;
 	}
 
-	if (to_ms_since_boot(get_absolute_time()) - last_packet_ms >= STALE_MS) {
+	if (last_packet_ms && to_ms_since_boot(get_absolute_time()) - last_packet_ms >= STALE_MS) {
 		packet_neutral(pads);
-		last_packet_ms = to_ms_since_boot(get_absolute_time());
+		last_packet_ms = 0;
 	}
 }
 
 static void hid_push(void) {
+	if (tud_suspended()) {
+		tud_remote_wakeup();
+		return;
+	}
 	if (!tud_mounted()) return;
-	uint8_t n = usb_hid_count();
-	for (uint8_t i = 0; i < n; i++) {
+	for (uint8_t i = 0; i < PAD_COUNT; i++) {
 		if (!tud_hid_n_ready(i)) continue;
-		uint8_t slot = slot_of_hid(i);
-		if (slot >= PAD_COUNT) continue;
 		hid_report_t report;
-		fill_report(&pads[slot], &report);
+		fill_report(&pads[i], &report);
 		tud_hid_n_report(i, 0, &report, sizeof(report));
 	}
 }
@@ -145,11 +123,9 @@ uint16_t tud_hid_get_report_cb(
 ) {
 	(void)report_id;
 	(void)report_type;
-	if (instance >= usb_hid_count() || reqlen < sizeof(hid_report_t)) return 0;
-	uint8_t slot = slot_of_hid(instance);
-	if (slot >= PAD_COUNT) return 0;
+	if (instance >= PAD_COUNT || reqlen < sizeof(hid_report_t)) return 0;
 	hid_report_t report;
-	fill_report(&pads[slot], &report);
+	fill_report(&pads[instance], &report);
 	memcpy(buffer, &report, sizeof(report));
 	return sizeof(report);
 }
@@ -171,12 +147,6 @@ void tud_hid_set_report_cb(
 int main(void) {
 	board_init();
 	packet_init(pads);
-	last_packet_ms = to_ms_since_boot(get_absolute_time());
-
-#ifdef PICO_DEFAULT_LED_PIN
-	gpio_init(PICO_DEFAULT_LED_PIN);
-	gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#endif
 
 	uart_init(UART_ID, UART_BAUD);
 	gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
@@ -188,9 +158,10 @@ int main(void) {
 	irq_set_enabled(UART_IRQ, true);
 	uart_set_irq_enables(UART_ID, true, false);
 
-	tusb_init();
-	usb_set_hid_count(0);
-	tud_disconnect();
+	tud_init(BOARD_TUD_RHPORT);
+#if __has_include("bsp/board_api.h")
+	if (board_init_after_tusb) board_init_after_tusb();
+#endif
 
 	while (1) {
 		tud_task();

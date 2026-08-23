@@ -1,3 +1,5 @@
 **/.env
 **/data
 firmware/build/
+**/__pycache__/
+*.pyc

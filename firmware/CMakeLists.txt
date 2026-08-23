@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-set(PICO_BOARD pico CACHE STRING "Pico board (pico, pico_w, pico2)")
+set(PICO_BOARD pico CACHE STRING "Pico board (pico, pico_w, pico2, pico2_w)")
 
 include(${CMAKE_CURRENT_LIST_DIR}/pico_sdk_import.cmake)
 
@@ -30,4 +30,4 @@ pico_enable_stdio_uart(s2pipe_pico 0)
 pico_add_extra_outputs(s2pipe_pico)
 
 pico_set_program_name(s2pipe_pico "s2pipe")
-pico_set_program_description(s2pipe_pico "s2pipe Switch pads")
+pico_set_program_description(s2pipe_pico "s2pipe 4x HORI Pokken")

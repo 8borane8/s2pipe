@@ -12,7 +12,14 @@ import {
 	KEYBOARD_HELP,
 	listGamepads,
 } from "../utils/input.ts";
-import { readStreamStats, startAudioWhep, startWhep, type AudioWhepHandle, type StreamStats, type WhepHandle } from "../utils/whep.ts";
+import {
+	type AudioWhepHandle,
+	readStreamStats,
+	startAudioWhep,
+	startWhep,
+	type StreamStats,
+	type WhepHandle,
+} from "../utils/whep.ts";
 
 type Props = {
 	nodeUrl: string;
@@ -382,7 +389,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						<span class="pill" data-ok={capture.value?.running ? "true" : "false"}>
 							Capture {capture.value?.running ? "live" : "down"}
 						</span>
-						<span class="pill" data-ok={pico.value?.connected ? "true" : "false"}>
+						<span
+							class="pill"
+							data-ok={pico.value?.connected ? "true" : "false"}
+							title={pico.value?.error ?? pico.value?.path ?? undefined}
+						>
 							Pico {pico.value?.connected ? "ready" : "off"}
 						</span>
 						<span class="pill" data-ok={connected.value ? "true" : "false"}>
@@ -499,7 +510,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 								</div>
 							))}
 						</dl>
-						<p>Click the video while on a pad to lock the pointer for the right stick.</p>
+						<p>
+							On a pad: Home / PS / Guide is Home. Capture / Share is Capture. Xbox often hides Guide —
+							press View+Menu instead. Click the video while on a pad to lock the pointer for the right
+							stick.
+						</p>
 					</section>
 				</aside>
 			)}

@@ -4,6 +4,7 @@ export type InputSource = { kind: "keyboard" } | { kind: "gamepad"; index: numbe
 
 export type GamepadOption = { index: number; id: string };
 
+// Standard Gamepad (W3C): 0–15. Home/PS/Guide is 16; Capture/Share/touchpad is 17.
 const FACE = [
 	PadButton.B,
 	PadButton.A,
@@ -21,7 +22,6 @@ const FACE = [
 	PadButton.Down,
 	PadButton.Left,
 	PadButton.Right,
-	PadButton.Home,
 ] as const;
 
 const KEY_BUTTONS: Record<string, number> = {
@@ -74,14 +74,27 @@ export function listGamepads(): GamepadOption[] {
 	return [...navigator.getGamepads()].flatMap((pad, index) => pad ? [{ index, id: pad.id }] : []);
 }
 
+function buttonDown(button: GamepadButton | undefined): boolean {
+	return Boolean(button && (button.pressed || button.value >= 0.5));
+}
+
 function sampleGamepad(index: number): PadState | null {
 	const pad = navigator.getGamepads()[index];
 	if (!pad) return null;
 
 	let buttons = 0;
 	for (let i = 0; i < FACE.length && i < pad.buttons.length; i++) {
-		const btn = pad.buttons[i];
-		if (btn.pressed || btn.value >= 0.5) buttons |= FACE[i];
+		if (buttonDown(pad.buttons[i])) buttons |= FACE[i];
+	}
+
+	// Switch Home, DualSense PS, Xbox Guide (when the browser exposes it).
+	if (buttonDown(pad.buttons[16])) buttons |= PadButton.Home;
+	// Switch Capture, Xbox Series Share, DualSense touchpad click.
+	if (buttonDown(pad.buttons[17])) buttons |= PadButton.Capture;
+
+	// Xbox Guide is often hidden in Chrome. View+Menu (Share+Options) → Home.
+	if ((buttons & PadButton.Minus) !== 0 && (buttons & PadButton.Plus) !== 0) {
+		buttons |= PadButton.Home;
 	}
 
 	return fromAxes(
@@ -175,6 +188,8 @@ export const KEYBOARD_HELP = [
 	["Z / X", "ZL / ZR"],
 	["Enter / -", "Plus / Minus"],
 	["H / G", "Home / Capture"],
+	["Pad Home · PS · Guide", "Home"],
+	["View + Menu", "Home if Guide is hidden (Xbox)"],
 	["F / V", "L-stick / R-stick click"],
 	["Esc", "Settings"],
 ] as const;
