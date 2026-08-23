@@ -115,6 +115,10 @@ winget install --interactive --exact dorssel.usbipd-win
 `usbipd list` must show **Attached**, not only Shared. The serial adapter usually becomes `/dev/ttyUSB0`. The HDMI card
 often has **no** `/dev/video0`: the stock WSL kernel has no UVC. While attached, Windows cannot use that port.
 
+After attach (and after Compose is up), **open a WSL window once** (`wsl` or the Ubuntu app). Compose does not see the
+attached USB devices until that distro is actually running. You can close the WSL window right after. Why this is needed
+is unclear; without it, `/dev/ttyUSB0` and the capture card stay invisible to the containers.
+
 **Audio** (HDMI sound from the card)
 
 Video is `/dev/video0`. HDMI audio is a **separate ALSA device**. Empty `CAPTURE_AUDIO` = silence. To send sound to the
@@ -162,8 +166,8 @@ Still stuck: `.\scripts\stop.ps1 -WslShutdown` (restarts WSL, not the PC). Then 
 Open [http://localhost:5000](http://localhost:5000). With `--profile all`, the client uses `NODE_BASE_URL` and skips the
 connect page.
 
-Start in **Watch**. **Play** takes a Pico seat (max 4). **Watch** releases it. Keyboard/mouse or a gamepad at the
-bottom. Click the video while playing to lock the pointer (right stick). Esc = settings.
+Start in **Watch**. **Play** takes a Pico seat (max 4). **Watch** releases it. Pick a gamepad at the bottom. Esc =
+settings. The HUD stays on until fullscreen.
 
 Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch player numbers.
 

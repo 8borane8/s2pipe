@@ -14,8 +14,10 @@
 	user-select: none;
 }
 
-#play[data-locked="true"] {
-	cursor: none;
+#play[data-idle="true"] .play-hud {
+	opacity: 0;
+	pointer-events: none;
+	transition: none;
 }
 
 #play > video {
@@ -53,12 +55,6 @@
 		rgb(7 8 10 / 0.72) 100%
 	);
 
-	pointer-events: none;
-	transition: opacity var(--ease);
-}
-
-#play[data-idle="true"] .play-hud {
-	opacity: 0;
 	pointer-events: none;
 }
 
@@ -180,6 +176,20 @@
 
 .play-controller {
 	min-width: 0;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.play-hint {
+	margin: 0;
+
+	color: var(--muted);
+	font-size: 0.75rem;
+	line-height: 1.3;
+	text-align: center;
 }
 
 .play-controller > select {

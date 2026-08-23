@@ -7,11 +7,11 @@ import type { PicoStatus } from "@s2pipe/shared/types/node";
 const SERIAL_BAUD = 921600;
 const FLUSH_MS = 8;
 const KEEPALIVE_TICKS = 12;
+const WRITE_TIMEOUT_MS = 250;
 
 const pads: PadState[] = Array.from({ length: PAD_COUNT }, () => neutralPad());
 
 let file: Deno.FsFile | null = null;
-let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
 let picoError: string | null = null;
 let dirty = false;
 let flushing = false;
@@ -24,11 +24,13 @@ export function setPad(index: number, state: PadState): void {
 	if (samePad(pads[index]!, next)) return;
 	pads[index] = next;
 	dirty = true;
+	void flush();
 }
 
 export function clearPad(index: number): void {
 	pads[index] = neutralPad();
 	dirty = true;
+	void flush();
 }
 
 export function picoStatus(): PicoStatus {
@@ -39,34 +41,55 @@ export function picoStatus(): PicoStatus {
 	};
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+	return new Promise((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error(message)), ms);
+		promise.then(
+			(value) => {
+				clearTimeout(timer);
+				resolve(value);
+			},
+			(error) => {
+				clearTimeout(timer);
+				reject(error);
+			},
+		);
+	});
+}
+
+async function writeAll(handle: Deno.FsFile, data: Uint8Array): Promise<void> {
+	let offset = 0;
+	while (offset < data.length) {
+		const n = await handle.write(data.subarray(offset));
+		if (n === 0) throw new Error("serial write stalled");
+		offset += n;
+	}
+}
+
 async function flush(): Promise<void> {
-	if (!writer || !dirty || flushing) return;
+	if (!file || !dirty || flushing) return;
 	flushing = true;
-	dirty = false;
 	try {
-		await writer.write(encodePacket(pads, padMask()));
-		picoError = null;
+		while (file && dirty) {
+			dirty = false;
+			await withTimeout(writeAll(file, encodePacket(pads, padMask())), WRITE_TIMEOUT_MS, "serial write timeout");
+			picoError = null;
+		}
 	} catch (error) {
 		picoError = error instanceof Error ? error.message : String(error);
-		await closePico();
+		closePico();
 	} finally {
 		flushing = false;
 	}
 }
 
-async function closePico(): Promise<void> {
+function closePico(): void {
 	stopFlush();
-	try {
-		await writer?.close();
-	} catch {
-		// ignore
-	}
 	try {
 		file?.close();
 	} catch {
 		// ignore
 	}
-	writer = null;
 	file = null;
 }
 
@@ -100,13 +123,26 @@ async function setSerialBaud(path: string): Promise<void> {
 		const com = windowsComPort(path);
 		if (!com) throw new Error(`invalid COM port: ${path}`);
 		command = new Deno.Command("mode", {
-			args: [`${com}:`, `BAUD=${SERIAL_BAUD}`, "PARITY=N", "DATA=8", "STOP=1"],
+			args: [`${com}:`, `BAUD=${SERIAL_BAUD}`, "PARITY=N", "DATA=8", "STOP=1", "XON=OFF", "OCTS=OFF", "RTS=OFF"],
 			stdout: "piped",
 			stderr: "piped",
 		});
 	} else {
 		command = new Deno.Command("stty", {
-			args: ["-F", path, String(SERIAL_BAUD), "raw", "-echo", "cs8", "-parenb", "-cstopb"],
+			args: [
+				"-F",
+				path,
+				String(SERIAL_BAUD),
+				"raw",
+				"-echo",
+				"cs8",
+				"-parenb",
+				"-cstopb",
+				"-crtscts",
+				"-ixon",
+				"-ixoff",
+				"clocal",
+			],
 			stdout: "piped",
 			stderr: "piped",
 		});
@@ -124,16 +160,16 @@ async function openPico(): Promise<void> {
 	if (!config.picoSerial || file) return;
 
 	try {
-		file = await Deno.open(config.picoSerial, { read: true, write: true });
 		await setSerialBaud(config.picoSerial);
-		writer = file.writable.getWriter();
+		file = await Deno.open(config.picoSerial, { write: true });
+		await setSerialBaud(config.picoSerial);
 		picoError = null;
 		dirty = true;
 		startFlush();
 		await flush();
 	} catch (error) {
 		picoError = error instanceof Error ? error.message : String(error);
-		await closePico();
+		closePico();
 	}
 }
 

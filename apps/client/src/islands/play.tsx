@@ -40,6 +40,10 @@ function send(ws: WebSocket | null, message: ClientMessage): void {
 	if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
 }
 
+function firstPad(list: GamepadOption[]): InputSource | null {
+	return list[0] ? { kind: "gamepad", index: list[0].index } : null;
+}
+
 export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const stageRef = useRef<HTMLElement>(null);
@@ -48,7 +52,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const wsRef = useRef<WebSocket | null>(null);
 	const inputRef = useRef<ReturnType<typeof createInputTracker> | null>(null);
 	const statsPrev = useRef<{ bytes: number; at: number } | null>(null);
-	const idleTimer = useRef<ReturnType<typeof setTimeout> | 0>(0);
 	const toastSeq = useRef(0);
 	const playRequested = useRef(false);
 
@@ -58,7 +61,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const capture = useSignal<CaptureStatus | null>(null);
 	const pico = useSignal<PicoStatus | null>(null);
 	const pads = useSignal<GamepadOption[]>([]);
-	const source = useSignal<InputSource>({ kind: "keyboard" });
+	const source = useSignal<InputSource | null>(null);
 	const settings = useSignal(false);
 	const muted = useSignal(false);
 	const volume = useSignal(1);
@@ -66,10 +69,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const showStats = useSignal(false);
 	const stats = useSignal<StreamStats | null>(null);
 	const fullscreen = useSignal(false);
-	const idle = useSignal(false);
 	const live = useSignal(false);
 	const toasts = useSignal<Toast[]>([]);
-	const locked = useSignal(false);
 
 	const padList = pads.value;
 	const inputSource = source.value;
@@ -80,14 +81,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		setTimeout(() => {
 			toasts.value = toasts.value.filter((item) => item.id !== id);
 		}, 4200);
-	}
-
-	function bumpHud(): void {
-		idle.value = false;
-		if (idleTimer.current) clearTimeout(idleTimer.current);
-		idleTimer.current = setTimeout(() => {
-			if (!settings.value) idle.value = true;
-		}, 2500);
 	}
 
 	useEffect(() => {
@@ -192,9 +185,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			const next = listGamepads();
 			pads.value = next;
 			const current = source.value;
-			if (current.kind === "gamepad" && !next.some((pad) => pad.index === current.index)) {
-				source.value = next[0] ? { kind: "gamepad", index: next[0].index } : { kind: "keyboard" };
-			}
+			if (current && next.some((pad) => pad.index === current.index)) return;
+			source.value = firstPad(next);
 		};
 		onPads();
 		globalThis.addEventListener("gamepadconnected", onPads);
@@ -205,7 +197,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			inputRef.current = null;
 			globalThis.removeEventListener("gamepadconnected", onPads);
 			globalThis.removeEventListener("gamepaddisconnected", onPads);
-			if (idleTimer.current) clearTimeout(idleTimer.current);
 		};
 	}, []);
 
@@ -217,8 +208,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			frame = requestAnimationFrame(loop);
 			const tracker = inputRef.current;
 			const ws = wsRef.current;
-			if (!tracker || !ws || ws.readyState !== WebSocket.OPEN) return;
-			const state = tracker.sample(source.value);
+			const pad = source.value;
+			if (!tracker || !pad || !ws || ws.readyState !== WebSocket.OPEN) return;
+			const state = tracker.sample(pad);
 			if (last !== null && samePad(last, state)) return;
 			last = state;
 			send(ws, { op: "pad", data: state });
@@ -230,9 +222,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.code !== "Escape" || event.repeat) return;
-			if (document.pointerLockElement) return;
 			settings.value = !settings.value;
-			idle.value = false;
 		};
 		globalThis.addEventListener("keydown", onKey);
 		return () => globalThis.removeEventListener("keydown", onKey);
@@ -265,18 +255,12 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 	useEffect(() => {
 		const onFs = () => {
-			fullscreen.value = document.fullscreenElement === stageRef.current;
-		};
-		const onLock = () => {
-			locked.value = document.pointerLockElement === videoRef.current;
-			if (!locked.value) inputRef.current?.resetLook();
+			const on = document.fullscreenElement === stageRef.current;
+			fullscreen.value = on;
+			if (on) settings.value = false;
 		};
 		document.addEventListener("fullscreenchange", onFs);
-		document.addEventListener("pointerlockchange", onLock);
-		return () => {
-			document.removeEventListener("fullscreenchange", onFs);
-			document.removeEventListener("pointerlockchange", onLock);
-		};
+		return () => document.removeEventListener("fullscreenchange", onFs);
 	}, []);
 
 	function play(): void {
@@ -284,23 +268,17 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 		playRequested.current = true;
 		send(wsRef.current, { op: "play" });
-		bumpHud();
 	}
 
 	function watch(): void {
 		playRequested.current = false;
 		playing.value = false;
 		send(wsRef.current, { op: "watch" });
-		if (document.pointerLockElement) document.exitPointerLock();
-		bumpHud();
 	}
 
 	function onStageClick(): void {
-		bumpHud();
 		void videoRef.current?.play();
 		void audioRef.current?.audio.play();
-		if (!playing.value || settings.value) return;
-		videoRef.current?.requestPointerLock().catch(() => {});
 	}
 
 	function toggleFullscreen(): void {
@@ -309,11 +287,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}
 
 	function onSourceChange(event: Event): void {
-		const value = (event.target as HTMLSelectElement).value;
-		source.value = value === "keyboard" ? { kind: "keyboard" } : { kind: "gamepad", index: Number(value) };
+		const value = Number((event.target as HTMLSelectElement).value);
+		if (Number.isFinite(value)) source.value = { kind: "gamepad", index: value };
 	}
 
-	const hideHud = locked.value || (idle.value && live.value && !settings.value);
+	const hideHud = fullscreen.value;
 	const padsFull = playingCount.value >= PAD_COUNT && !playing.value;
 
 	return (
@@ -322,8 +300,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			ref={stageRef}
 			data-fill={fill.value ? "true" : undefined}
 			data-idle={hideHud ? "true" : undefined}
-			data-locked={locked.value ? "true" : undefined}
-			onMouseMove={bumpHud}
 			onClick={onStageClick}
 			onDblClick={(event) => {
 				event.preventDefault();
@@ -337,7 +313,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				playsInline
 				onPlaying={() => {
 					live.value = true;
-					bumpHud();
 				}}
 			/>
 
@@ -406,12 +381,15 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					<label class="play-controller">
 						<select
 							aria-label="Controller"
-							value={inputSource.kind === "keyboard" ? "keyboard" : String(inputSource.index)}
+							value={inputSource ? String(inputSource.index) : ""}
 							onChange={onSourceChange}
 						>
-							<option value="keyboard">Keyboard & mouse</option>
+							{padList.length === 0 && <option value="" disabled>Connect a gamepad</option>}
 							{padList.map((pad) => <option value={String(pad.index)}>{pad.id}</option>)}
 						</select>
+						{connected.value && !playing.value && (
+							<span class="play-hint">Click Play, then use a gamepad.</span>
+						)}
 					</label>
 					<div class="play-tools">
 						<button
@@ -434,10 +412,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							type="button"
 							class="btn btn-icon"
 							aria-label="Settings"
-							onClick={() => {
-								settings.value = !settings.value;
-								idle.value = false;
-							}}
+							onClick={() => settings.value = !settings.value}
 						>
 							<Settings size={16} />
 						</button>
@@ -501,7 +476,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					</label>
 
 					<section class="play-help">
-						<h3>Keyboard</h3>
+						<h3>Gamepad</h3>
 						<dl>
 							{KEYBOARD_HELP.map(([key, action]) => (
 								<div>
@@ -511,9 +486,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							))}
 						</dl>
 						<p>
-							On a pad: Home / PS / Guide is Home. Capture / Share is Capture. Xbox often hides Guide —
-							press View+Menu instead. Click the video while on a pad to lock the pointer for the right
-							stick.
+							Home / PS / Guide is Home. Capture / Share is Capture. Xbox often hides Guide — View+Menu.
 						</p>
 					</section>
 				</aside>
