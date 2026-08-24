@@ -119,6 +119,10 @@ After attach (and after Compose is up), **open a WSL window once** (`wsl` or the
 attached USB devices until that distro is actually running. You can close the WSL window right after. Why this is needed
 is unclear; without it, `/dev/ttyUSB0` and the capture card stay invisible to the containers.
 
+**usbipd adds latency.** It tunnels USB into WSL (capture card + UART). Extra hops, extra jitter. The same setup on
+**Linux** is faster: plug the card and the Pico UART into the machine that runs Compose, no usbipd. Windows is fine to
+try the stack; for play, prefer Linux.
+
 **Audio** (HDMI sound from the card)
 
 Video is `/dev/video0`. HDMI audio is a **separate ALSA device**. Empty `CAPTURE_AUDIO` = silence. To send sound to the
@@ -180,7 +184,7 @@ Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch 
 | `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE (UDP)                                     |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                              |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2; ALSA HDMI (`hw:0,0`) or silence         |
-| `CAPTURE_FORMAT`                   | `mjpeg`                 | V4L2 format (`yuyv` if the card has no MJPEG) |
+| `CAPTURE_FORMAT`                   | `yuyv422`               | V4L2/FFmpeg format (`yuyv422`, or `mjpeg` if USB chokes) |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                                   |
 | `FFMPEG_ENCODER`                   | `libx264`               | `libx264` or `h264_nvenc` (GPU overlay)       |
 | `FFMPEG_EXTRA`                     | empty                   | Extra FFmpeg args                             |
