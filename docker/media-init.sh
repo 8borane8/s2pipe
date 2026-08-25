@@ -48,6 +48,12 @@ done
 
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
 fps="${CAPTURE_FPS}"
+
+# Duree minimale (secondes) d'image noire / figee avant de forcer un restart.
+# A augmenter si des ecrans de chargement noirs legitimes declenchent des faux positifs.
+black_secs="${CAPTURE_BLACK_SECS:-8}"
+freeze_secs="${CAPTURE_FREEZE_SECS:-8}"
+
 opus=(-c:a libopus -application lowdelay -b:a 64k -ar 48000 -ac 2)
 rtsp_audio=(-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch-audio)
 
@@ -79,6 +85,8 @@ stopping=0
 ffpid=""
 apid=""
 wpid=""
+bpid=""
+errfile=/tmp/s2pipe-ffmpeg.log
 
 stop_child() {
 	local child="${1:-}"
@@ -96,6 +104,8 @@ cleanup() {
 	trap - INT TERM
 	stop_child "$wpid"
 	wpid=""
+	stop_child "$bpid"
+	bpid=""
 	stop_child "$ffpid"
 	ffpid=""
 	stop_child "$apid"
@@ -166,6 +176,8 @@ wait_capture() {
 	return 1
 }
 
+# Redemarre ffmpeg si MediaMTX ne recoit plus d'octets sur /switch (flux
+# totalement coupe: crash silencieux, deconnexion, etc).
 watch_publisher() {
 	local idle=0
 	local last=""
@@ -189,6 +201,27 @@ watch_publisher() {
 	done
 }
 
+# Redemarre ffmpeg si l'IMAGE elle-meme reste noire ou figee alors que le
+# flux continue d'etre recu (carte de capture bloquee sans crasher, signal
+# HDMI mal renegocie apres un restart docker, etc). S'appuie sur les filtres
+# blackdetect/freezedetect dont les evenements sont parses dans errfile.
+watch_video() {
+	tail -n0 -F "$errfile" 2>/dev/null | while IFS= read -r line; do
+		case "$line" in
+		*black_start* | *freeze_start*)
+			echo "video black/frozen detected, restarting ffmpeg" >&2
+			kill -INT "$ffpid" 2>/dev/null || true
+			break
+			;;
+		esac
+	done
+}
+
+start_audio() {
+	ffmpeg -hide_banner -loglevel error "$@" "${opus[@]}" "${rtsp_audio[@]}" &
+	apid=$!
+}
+
 case "$CAPTURE_SOURCE" in
 	test | v4l2) ;;
 	*)
@@ -197,52 +230,55 @@ case "$CAPTURE_SOURCE" in
 		;;
 esac
 
-retry=0
 while [ "$stopping" = 0 ]; do
 	dev=""
+	vf=()
 	if [ "$CAPTURE_SOURCE" = "v4l2" ]; then
-		if [ "$retry" = 1 ]; then
-			prev=$(find_capture 2>/dev/null || printf '%s\n' "$CAPTURE_DEVICE")
-			if [ -e "$prev" ]; then
-				fuser -k "$prev" >/dev/null 2>&1 || true
-				reset_usb "$prev"
-			fi
+		# Reset systematique du port USB avant chaque tentative: une carte de
+		# capture bloquee (typiquement apres un restart docker brutal de la
+		# session precedente) ne repart souvent pas juste en relancant ffmpeg,
+		# il lui faut le cycle authorized=0/1 pour renegocier le signal HDMI.
+		prev=$(find_capture 2>/dev/null || printf '%s\n' "$CAPTURE_DEVICE")
+		if [ -e "$prev" ]; then
+			fuser -k "$prev" >/dev/null 2>&1 || true
+			reset_usb "$prev"
 		fi
 		dev=$(wait_capture) || {
 			echo "waiting for capture card..." >&2
-			retry=1
 			sleep 3
 			continue
 		}
-		fuser -k "$dev" >/dev/null 2>&1 || true
 		echo "capture device ${dev}" >&2
 		fmt="${CAPTURE_FORMAT:-yuyv422}"
 		input=(-use_wallclock_as_timestamps 1 -fflags +genpts -f v4l2 -input_format "$fmt" \
 			-framerate "$fps" -video_size "$size" -i "$dev")
+		vf=(-vf "blackdetect=d=${black_secs}:pix_th=0.10,freezedetect=n=0.001:d=${freeze_secs}")
 	else
 		input=(-re -f lavfi -i "testsrc2=size=${size}:rate=${fps}")
 	fi
 
 	apid=""
 	if [ "$CAPTURE_SOURCE" = "test" ]; then
-		ffmpeg -hide_banner -loglevel error -re -f lavfi -i "sine=frequency=440:sample_rate=48000" \
-			"${opus[@]}" "${rtsp_audio[@]}" &
-		apid=$!
+		start_audio -re -f lavfi -i "sine=frequency=440:sample_rate=48000"
 	elif [ -n "${CAPTURE_AUDIO:-}" ]; then
-		ffmpeg -hide_banner -loglevel error -use_wallclock_as_timestamps 1 -f alsa -i "$CAPTURE_AUDIO" \
-			"${opus[@]}" "${rtsp_audio[@]}" &
-		apid=$!
+		start_audio -use_wallclock_as_timestamps 1 -f alsa -i "$CAPTURE_AUDIO"
 	fi
 
-	ffmpeg -hide_banner -loglevel warning "${input[@]}" "${video[@]}" -an \
-		-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch &
+	: > "$errfile"
+	ffmpeg -hide_banner -nostats -loglevel info "${input[@]}" "${vf[@]}" "${video[@]}" -an \
+		-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch \
+		2> >(tee -a "$errfile" >&2) &
 	ffpid=$!
 	watch_publisher &
 	wpid=$!
+	watch_video &
+	bpid=$!
 	wait "$ffpid" || true
 	ffpid=""
 	stop_child "$wpid"
 	wpid=""
+	stop_child "$bpid"
+	bpid=""
 	stop_child "$apid"
 	apid=""
 
@@ -250,7 +286,6 @@ while [ "$stopping" = 0 ]; do
 		break
 	fi
 	echo "ffmpeg exited, retrying capture" >&2
-	retry=1
 	sleep 2
 done
 
