@@ -13,15 +13,19 @@ import {
 } from "@/services/sockets.ts";
 import type { ClientMessage, ServerMessage } from "@s2pipe/shared/types/node";
 
+let lastCapture = "";
+
 function send(ws: WebSocket, message: ServerMessage): void {
 	if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
 }
 
 async function currentStatus(): Promise<ServerMessage> {
+	const capture = await captureStatus();
+	lastCapture = `${capture.running}:${capture.error ?? ""}`;
 	return {
 		op: "status",
 		data: {
-			capture: await captureStatus(),
+			capture,
 			pico: picoStatus(),
 			playing: playingCount(),
 		},
@@ -32,6 +36,14 @@ async function pushStatus(): Promise<void> {
 	const message = await currentStatus();
 	forEachViewer((ws) => send(ws, message));
 }
+
+setInterval(() => {
+	void captureStatus().then((status) => {
+		const key = `${status.running}:${status.error ?? ""}`;
+		if (key === lastCapture) return;
+		void pushStatus();
+	});
+}, 2000);
 
 function bind(ws: WebSocket): void {
 	addViewer(ws);

@@ -4,7 +4,7 @@ export type InputSource = { kind: "gamepad"; index: number };
 
 export type GamepadOption = { index: number; id: string };
 
-// Standard Gamepad (W3C): 0–15. Home/PS/Guide is 16; Capture/Share/touchpad is 17.
+// Standard Gamepad (W3C): 0-15. Home/PS/Guide is 16; Capture/Share/touchpad is 17.
 const FACE = [
 	PadButton.B,
 	PadButton.A,
@@ -131,7 +131,7 @@ export function createInputTracker() {
 
 export const KEYBOARD_HELP = [
 	["H / G", "Home / Capture"],
-	["Home · PS · Guide", "Home"],
-	["View + Menu", "Home if Guide is hidden (Xbox)"],
+	["Home / PS / Guide", "Home"],
+	["View + Menu", "Home (Xbox if Guide opens Game Bar)"],
 	["Esc", "Settings"],
 ] as const;

@@ -14,6 +14,7 @@ import {
 } from "../utils/input.ts";
 import {
 	type AudioWhepHandle,
+	onWhepDead,
 	readStreamStats,
 	startAudioWhep,
 	startWhep,
@@ -51,6 +52,32 @@ function picoTitle(pico: PicoStatus | null): string | undefined {
 
 function firstPad(list: GamepadOption[]): InputSource | null {
 	return list[0] ? { kind: "gamepad", index: list[0].index } : null;
+}
+
+function streamBanner(
+	connected: boolean,
+	capture: CaptureStatus | null,
+	live: boolean,
+): { title: string; body: string } | null {
+	if (!connected) {
+		return { title: "Connecting", body: "Waiting for the node..." };
+	}
+	if (capture && !capture.running) {
+		if (capture.error === "not_publishing") {
+			return {
+				title: "No capture signal",
+				body: "The card is not publishing. Check HDMI, or wait while the USB device resets.",
+			};
+		}
+		return {
+			title: "Capture is down",
+			body: "MediaMTX is unreachable. The capture PC may be restarting.",
+		};
+	}
+	if (!live) {
+		return { title: "Waiting for stream", body: "Connecting to the capture card..." };
+	}
+	return null;
 }
 
 export default function Play({ nodeUrl, nodeLocked }: Props) {
@@ -96,40 +123,91 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		const video = videoRef.current;
 		if (!video) return;
 		let cancelled = false;
-		let handle: WhepHandle | null = null;
+		let generation = 0;
+		let videoHandle: WhepHandle | null = null;
 		let audioHandle: AudioWhepHandle | null = null;
+		let unwatchVideo: (() => void) | null = null;
+		let unwatchAudio: (() => void) | null = null;
+		let retry = 0;
+		let reconnecting = false;
+		let iceHinted = false;
 
-		startWhep(nodeUrl, video, () => {
-			toast("ICE failed. Set MEDIA_ICE_IP to this machine’s LAN address, not 127.0.0.1.");
-		}).then((next) => {
-			if (cancelled) {
-				void next.close();
-				return;
-			}
-			handle = next;
-			whepRef.current = next;
-		}).catch(() => {
-			if (!cancelled) toast("Could not start the stream.");
-		});
-
-		startAudioWhep(nodeUrl).then((next) => {
-			if (!next) return;
-			if (cancelled) {
-				void next.close();
-				return;
-			}
-			audioHandle = next;
-			audioRef.current = next;
-			next.audio.muted = muted.value;
-			next.audio.volume = volume.value;
-		}).catch(() => {});
-
-		return () => {
-			cancelled = true;
+		const drop = () => {
+			unwatchVideo?.();
+			unwatchAudio?.();
+			unwatchVideo = null;
+			unwatchAudio = null;
+			void videoHandle?.close();
+			void audioHandle?.close();
+			videoHandle = null;
+			audioHandle = null;
 			whepRef.current = null;
 			audioRef.current = null;
-			void handle?.close();
-			void audioHandle?.close();
+		};
+
+		const schedule = (delay: number) => {
+			if (cancelled || reconnecting) return;
+			reconnecting = true;
+			live.value = false;
+			generation++;
+			drop();
+			clearTimeout(retry);
+			retry = globalThis.setTimeout(() => {
+				reconnecting = false;
+				void connect();
+			}, delay);
+		};
+
+		const watch = (pc: RTCPeerConnection) =>
+			onWhepDead(pc, (hadMedia) => {
+				if (!hadMedia && !iceHinted) {
+					iceHinted = true;
+					toast("ICE failed. Set MEDIA_ICE_IP to this machine's LAN address, not 127.0.0.1.");
+				}
+				schedule(hadMedia ? 1500 : 2000);
+			});
+
+		const connect = async () => {
+			const gen = ++generation;
+			try {
+				const next = await startWhep(nodeUrl, video);
+				if (cancelled || gen !== generation) {
+					await next.close();
+					return;
+				}
+				videoHandle = next;
+				whepRef.current = next;
+				unwatchVideo = watch(next.pc);
+			} catch {
+				if (!cancelled && gen === generation) {
+					clearTimeout(retry);
+					retry = globalThis.setTimeout(() => void connect(), 2000);
+				}
+				return;
+			}
+
+			try {
+				const nextAudio = await startAudioWhep(nodeUrl);
+				if (!nextAudio) return;
+				if (cancelled || gen !== generation) {
+					await nextAudio.close();
+					return;
+				}
+				audioHandle = nextAudio;
+				audioRef.current = nextAudio;
+				nextAudio.audio.muted = muted.value;
+				nextAudio.audio.volume = volume.value;
+				unwatchAudio = watch(nextAudio.pc);
+			} catch {
+				/* video can still play */
+			}
+		};
+
+		void connect();
+		return () => {
+			cancelled = true;
+			clearTimeout(retry);
+			drop();
 		};
 	}, [nodeUrl]);
 
@@ -158,6 +236,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						if (!msg.data.playing) toast("All remote pads are taken.");
 					} else if (msg.op === "status") {
 						capture.value = msg.data.capture;
+						if (!msg.data.capture.running) live.value = false;
 						pico.value = msg.data.pico;
 						playingCount.value = msg.data.playing;
 					}
@@ -302,6 +381,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 	const hideHud = fullscreen.value;
 	const padsFull = playingCount.value >= PAD_COUNT && !playing.value;
+	const banner = streamBanner(connected.value, capture.value, live.value);
 
 	return (
 		<section
@@ -324,6 +404,13 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					live.value = true;
 				}}
 			/>
+
+			{banner && (
+				<div class="play-banner">
+					<h2>{banner.title}</h2>
+					<p>{banner.body}</p>
+				</div>
+			)}
 
 			{showStats.value && (
 				<dl class="play-stats">
@@ -495,7 +582,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							))}
 						</dl>
 						<p>
-							Home / PS / Guide is Home. Capture / Share is Capture. Xbox often hides Guide: View+Menu.
+							Home / PS / Guide is Home. Capture / Share is Capture. Xbox Guide opens Windows Game Bar:
+							Settings &gt; Gaming &gt; Xbox Game Bar, turn off "Open Game Bar using this button on a
+							controller". Until then, View+Menu is Home.
 						</p>
 					</section>
 				</aside>

@@ -8,12 +8,24 @@ export async function captureStatus(): Promise<CaptureStatus> {
 	const now = Date.now();
 	if (cached && now - cached.at < TTL_MS) return cached.status;
 
+	const source = config.captureSource;
 	try {
-		const conn = await Deno.connect({ hostname: config.mediaHost, port: config.mediaPort });
-		conn.close();
-		cached = { at: now, status: { running: true, source: config.captureSource, error: null } };
+		const response = await fetch(
+			`http://${config.mediaHost}:${config.mediaApiPort}/v3/paths/get/switch`,
+			{ signal: AbortSignal.timeout(1500) },
+		);
+		if (!response.ok) {
+			cached = { at: now, status: { running: false, source, error: "not_publishing" } };
+			return cached.status;
+		}
+		const path = await response.json() as { ready?: boolean };
+		const ready = Boolean(path.ready);
+		cached = {
+			at: now,
+			status: { running: ready, source, error: ready ? null : "not_publishing" },
+		};
 	} catch {
-		cached = { at: now, status: { running: false, source: config.captureSource, error: "media_unavailable" } };
+		cached = { at: now, status: { running: false, source, error: "media_unavailable" } };
 	}
 	return cached.status;
 }

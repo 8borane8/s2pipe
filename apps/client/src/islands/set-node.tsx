@@ -66,7 +66,7 @@ export default function SetNode() {
 				</label>
 				{error.value && <p class="error">{error.value}</p>}
 				<button type="submit" class="btn btn-primary" disabled={pending.value}>
-					{pending.value ? "Checking…" : "Test and save"}
+					{pending.value ? "Checking..." : "Test and save"}
 				</button>
 			</form>
 		</article>

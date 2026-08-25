@@ -4,6 +4,7 @@ export type WhepHandle = {
 };
 
 export type AudioWhepHandle = {
+	pc: RTCPeerConnection;
 	audio: HTMLAudioElement;
 	close: () => Promise<void>;
 };
@@ -71,11 +72,49 @@ function closeWhep(pc: RTCPeerConnection, nodeUrl: string, location: string | nu
 	};
 }
 
-export async function startWhep(
-	nodeUrl: string,
-	video: HTMLVideoElement,
-	onIceFailed: () => void,
-): Promise<WhepHandle> {
+/** Fires once when the peer dies. `hadMedia` is true if it was connected before. */
+export function onWhepDead(pc: RTCPeerConnection, fn: (hadMedia: boolean) => void): () => void {
+	let hadMedia = false;
+	let fired = false;
+	let timer: ReturnType<typeof setTimeout> | null = null;
+
+	const fire = () => {
+		if (fired) return;
+		fired = true;
+		if (timer) {
+			clearTimeout(timer);
+			timer = null;
+		}
+		fn(hadMedia);
+	};
+
+	const onState = () => {
+		const state = pc.connectionState;
+		if (state === "connected") {
+			hadMedia = true;
+			if (timer) {
+				clearTimeout(timer);
+				timer = null;
+			}
+			return;
+		}
+		if (state === "failed") fire();
+		if (state !== "disconnected" || timer) return;
+		timer = setTimeout(() => {
+			timer = null;
+			if (pc.connectionState === "disconnected" || pc.connectionState === "failed") fire();
+		}, 1500);
+	};
+
+	pc.addEventListener("connectionstatechange", onState);
+	return () => {
+		fired = true;
+		if (timer) clearTimeout(timer);
+		pc.removeEventListener("connectionstatechange", onState);
+	};
+}
+
+export async function startWhep(nodeUrl: string, video: HTMLVideoElement): Promise<WhepHandle> {
 	const pc = new RTCPeerConnection(ice);
 	pc.addTransceiver("video", { direction: "recvonly" });
 	video.muted = true;
@@ -85,9 +124,6 @@ export async function startWhep(
 		if (event.receiver) preferLowJitter(event.receiver);
 		video.srcObject = new MediaStream([event.track]);
 		void video.play().catch(() => {});
-	});
-	pc.addEventListener("connectionstatechange", () => {
-		if (pc.connectionState === "failed") onIceFailed();
 	});
 
 	const location = await postWhep(nodeUrl, "/switch/whep", pc);
@@ -123,6 +159,7 @@ export async function startAudioWhep(nodeUrl: string): Promise<AudioWhepHandle |
 
 	const close = closeWhep(pc, nodeUrl, location);
 	return {
+		pc,
 		audio,
 		close: async () => {
 			audio.pause();

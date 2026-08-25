@@ -6,7 +6,7 @@ The Switch 2 hides its Bluetooth MAC. A paired Joy-Con 2 / Pro 2 broadcasts it.
 Phone (no BT on this PC):
   1. Pair the pad with the Switch 2 once.
   2. Sleep the console. Detach the Joy-Con (or press a button on a Pro 2).
-  3. nRF Connect → Scan → tap the pad. Copy Address + Manufacturer data.
+  3. nRF Connect -> Scan -> tap the pad. Copy Address + Manufacturer data.
   4. python3 scripts/wake-scan.py --decode 'PASTE_HEX' --pad AA:BB:CC:DD:EE:FF
 
 This PC has Bluetooth:

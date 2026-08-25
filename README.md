@@ -21,7 +21,7 @@ Browsers --WHEP + WebSocket--> node --UART--> Pico --USB--> Switch 2
 | **Client**   | `apps/client`             | Browser UI                               |
 | **Firmware** | `firmware`                | Pico: UART in, 4 USB pads out            |
 
-Anyone can **Watch**. Four **Play** seats. P1–P4 numbers are set on the Switch, not by s2pipe.
+Anyone can **Watch**. Four **Play** seats. P1-P4 numbers are set on the Switch, not by s2pipe.
 
 ## 1. Tested hardware
 
@@ -110,7 +110,9 @@ page.
 Start in **Watch**. **Play** takes a Pico seat (max 4). **Watch** releases it. Pick a gamepad at the bottom. Esc =
 settings. The HUD stays on until fullscreen.
 
-Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch player numbers.
+Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch player numbers. Capture is live only
+while MediaMTX has a `/switch` publisher. If FFmpeg or the UVC card wedges, the media container resets the USB device
+and republishes. The play page shows a centered message until the stream is back.
 
 Sleep wake (optional): [§6](#6-sleep-wake).
 
@@ -134,7 +136,7 @@ python3 scripts/wake-scan.py
 **Phone (nRF Connect):** copy the pad **Address** and the **Manufacturer data** hex, then:
 
 ```sh
-python3 scripts/wake-scan.py --decode '02 01 06 1B FF 53 05 …' --pad AA:BB:CC:DD:EE:FF
+python3 scripts/wake-scan.py --decode '02 01 06 1B FF 53 05 ...' --pad AA:BB:CC:DD:EE:FF
 ```
 
 4. Paste `SWITCH_BT_MAC`, `CONTROLLER_BT_MAC`, and `CONTROLLER_BT_PID` into `.env`. Restart:
@@ -183,8 +185,8 @@ deno check apps/node/src/index.ts
 deno check apps/client/src/index.ts
 ```
 
-**Media:** keep Compose. WHEP (`8889`) is not published. A host node needs `8889:8889` on media, or MediaMTX on the
-machine (`MEDIA_HOST`, default `127.0.0.1`).
+**Media:** keep Compose. WHEP (`8889`) and the MediaMTX API (`9997`) are not published. A host node needs `8889:8889`
+and `9997:9997` on media, or MediaMTX on the machine (`MEDIA_HOST`, default `127.0.0.1`).
 
 **Node:** `cd apps/node && cp .env.example .env && deno task dev` (5050). `PICO_SERIAL=/dev/ttyUSB0`.
 
@@ -201,7 +203,7 @@ Firmware and packet: keep `apps/node/src/utils/packet.ts` in sync with `firmware
 | `POST /switch/whep`       | Video WHEP; `PATCH` / `DELETE` `/switch/whep/:session`       |
 | `POST /switch-audio/whep` | Audio WHEP; `PATCH` / `DELETE` `/switch-audio/whep/:session` |
 
-- Client: `{ op: "play" }` · `{ op: "watch" }` · `{ op: "pad", data: PadState }`
+- Client: `{ op: "play" }` / `{ op: "watch" }` / `{ op: "pad", data: PadState }`
 - Server: `{ op: "status", data: { capture, pico, playing } }` on join and when seats change
 - Server: `{ op: "play", data: { playing: boolean } }` after Play (`false` if all four seats are taken)
 
