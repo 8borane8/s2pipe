@@ -8,7 +8,11 @@
 #define PACKET_SIZE 64
 #define PACKET_MAGIC 0x5332
 #define PACKET_VERSION 1
+#define PACKET_FLAG_WAKE 0x10
 #define PAD_CENTER 128
+#define PACKET_PID_DEFAULT 0x2069
+
+/* Wake flag 0x10: bytes 38-43 Switch MAC, 44-49 pad MAC (display order), 50-51 pad PID LE. CRC is 0-35. */
 
 typedef struct {
 	uint32_t buttons;
@@ -21,5 +25,6 @@ typedef struct {
 void packet_init(pad_state_t pads[PAD_COUNT]);
 void packet_neutral(pad_state_t pads[PAD_COUNT]);
 bool packet_push(uint8_t byte, pad_state_t pads[PAD_COUNT]);
+bool packet_take_wake(uint8_t switch_mac[6], uint8_t pad_mac[6], uint16_t *pid);
 
 #endif

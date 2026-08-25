@@ -40,6 +40,15 @@ function send(ws: WebSocket | null, message: ClientMessage): void {
 	if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
 }
 
+function picoTitle(pico: PicoStatus | null): string | undefined {
+	if (!pico) return undefined;
+	if (pico.error) return pico.error;
+	const parts: string[] = [];
+	if (pico.path) parts.push(pico.path);
+	if (pico.connected && !pico.wake) parts.push("Sleep wake: set SWITCH_BT_MAC and CONTROLLER_BT_MAC");
+	return parts.length ? parts.join("\n") : undefined;
+}
+
 function firstPad(list: GamepadOption[]): InputSource | null {
 	return list[0] ? { kind: "gamepad", index: list[0].index } : null;
 }
@@ -367,7 +376,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						<span
 							class="pill"
 							data-ok={pico.value?.connected ? "true" : "false"}
-							title={pico.value?.error ?? pico.value?.path ?? undefined}
+							title={picoTitle(pico.value)}
 						>
 							Pico {pico.value?.connected ? "ready" : "off"}
 						</span>
@@ -486,7 +495,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							))}
 						</dl>
 						<p>
-							Home / PS / Guide is Home. Capture / Share is Capture. Xbox often hides Guide — View+Menu.
+							Home / PS / Guide is Home. Capture / Share is Capture. Xbox often hides Guide: View+Menu.
 						</p>
 					</section>
 				</aside>

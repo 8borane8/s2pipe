@@ -11,6 +11,7 @@
 #endif
 
 #include "packet.h"
+#include "wake_ble.h"
 
 #include <string.h>
 
@@ -92,6 +93,9 @@ static void uart_drain(void) {
 		if (!packet_push(byte, pads)) continue;
 		last_packet_ms = to_ms_since_boot(get_absolute_time());
 		if (last_packet_ms == 0) last_packet_ms = 1;
+		uint8_t sw[6], pad[6];
+		uint16_t pid;
+		if (packet_take_wake(sw, pad, &pid)) wake_ble_request(sw, pad, pid);
 	}
 
 	if (last_packet_ms && to_ms_since_boot(get_absolute_time()) - last_packet_ms >= STALE_MS) {
@@ -162,10 +166,12 @@ int main(void) {
 #if __has_include("bsp/board_api.h")
 	if (board_init_after_tusb) board_init_after_tusb();
 #endif
+	wake_ble_init();
 
 	while (1) {
 		tud_task();
 		uart_drain();
 		hid_push();
+		wake_ble_poll();
 	}
 }

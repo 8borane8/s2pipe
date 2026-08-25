@@ -10,6 +10,7 @@ export type PicoStatus = {
 	connected: boolean;
 	path: string | null;
 	error: string | null;
+	wake: boolean;
 };
 
 export type StatusData = {

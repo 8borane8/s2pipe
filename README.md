@@ -27,10 +27,10 @@ Anyone can **Watch**. Four **Play** seats. P1–P4 numbers are set on the Switch
 
 Equivalents are fine.
 
-- [Raspberry Pico 2 W](https://amzn.eu/d/09YZSwVw) — board `pico2_w`
-- [CP2102 UART adapter HW-598](https://amzn.eu/d/0catDsov) — jumper **3.3 V**, **no VCC** on the Pico (TX / RX / GND
+- [Raspberry Pico 2 W](https://amzn.eu/d/09YZSwVw), board `pico2_w`
+- [CP2102 UART adapter HW-598](https://amzn.eu/d/0catDsov), jumper **3.3 V**, **no VCC** on the Pico (TX / RX / GND
   only)
-- [XIIXMASK HDMI USB 3.0 capture](https://amzn.eu/d/09Xc9GcE) — UVC webcam, HDMI in + loop
+- [XIIXMASK HDMI USB 3.0 capture](https://amzn.eu/d/09Xc9GcE), UVC webcam, HDMI in + loop
 - Switch 2 + dock, a Linux PC, [Docker Engine + Compose](https://docs.docker.com/engine/install/)
 
 ## 2. Flash the Pico
@@ -71,14 +71,15 @@ cp .env.example .env
 
 Edit `.env`:
 
-|               | `.env`                                                                                  |
-| ------------- | --------------------------------------------------------------------------------------- |
-| This PC only  | leave `localhost`                                                                       |
-| Other LAN PCs | `NODE_BASE_URL=http://192.168.1.20:5050` and `MEDIA_ICE_IP=192.168.1.20`                |
-| HDMI          | `CAPTURE_SOURCE=v4l2` — UVC webcam, `ls /dev/video*` (`CAPTURE_DEVICE` if not `video0`) |
-| Color bars    | leave `CAPTURE_SOURCE=test`                                                             |
-| Pico          | `PICO_SERIAL=/dev/ttyUSB0` (`ls /dev/ttyUSB*`). No Pico = video only                    |
-| HDMI audio    | `CAPTURE_AUDIO=hw:0,0` after `cat /proc/asound/cards`. Empty = silence                  |
+|               | `.env`                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------- |
+| This PC only  | leave `localhost`                                                                      |
+| Other LAN PCs | `NODE_BASE_URL=http://192.168.1.20:5050` and `MEDIA_ICE_IP=192.168.1.20`               |
+| HDMI          | `CAPTURE_SOURCE=v4l2`, UVC webcam, `ls /dev/video*` (`CAPTURE_DEVICE` if not `video0`) |
+| Color bars    | leave `CAPTURE_SOURCE=test`                                                            |
+| Pico          | `PICO_SERIAL=/dev/ttyUSB0` (`ls /dev/ttyUSB*`). No Pico = video only                   |
+| HDMI audio    | `CAPTURE_AUDIO=hw:0,0` after `cat /proc/asound/cards`. Empty = silence                 |
+| Sleep wake    | [§6](#6-sleep-wake), `python3 scripts/wake-scan.py`                                    |
 
 `mjpeg` in `CAPTURE_FORMAT` if USB drops uncompressed frames. The browser must reach `NODE_BASE_URL` and
 `MEDIA_ICE_IP:MEDIA_ICE_PORT` (UDP). Click the video once if autoplay is blocked.
@@ -96,7 +97,7 @@ sudo systemctl restart docker
 ```
 
 Uncomment `COMPOSE_FILE` in `.env`, then the same `docker compose up --build`. Do not install encode packages inside the
-image — FFmpeg loads the host driver.
+image. FFmpeg loads the host driver.
 
 `.env` sets `COMPOSE_PROFILES=all`. Media + node only: `COMPOSE_PROFILES=node`. Client only: `COMPOSE_PROFILES=client`.
 Stop: Ctrl+C or `docker compose down`.
@@ -111,6 +112,38 @@ settings. The HUD stays on until fullscreen.
 
 Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch player numbers.
 
+Sleep wake (optional): [§6](#6-sleep-wake).
+
+## 6. Sleep wake
+
+The Pico 2 W can pull the Switch 2 out of **sleep** (not a full power-off) while a browser is on the play page. Switch 1
+Joy-Con / Pro Controller cannot wake a Switch 2. You need a **Joy-Con 2 / Pro 2 / NSO GameCube** already paired with
+that console. The console does **not** show its BT MAC in settings; the pad broadcasts it.
+
+1. Pair the pad with the Switch 2 once (normal Nintendo pairing).
+2. Put the Switch to **Sleep**. Detach the Joy-Con, or press a button on the Pro 2.
+3. Get the three lines for `.env`:
+
+**This PC has Bluetooth**
+
+```sh
+pip install bleak
+python3 scripts/wake-scan.py
+```
+
+**Phone (nRF Connect):** copy the pad **Address** and the **Manufacturer data** hex, then:
+
+```sh
+python3 scripts/wake-scan.py --decode '02 01 06 1B FF 53 05 …' --pad AA:BB:CC:DD:EE:FF
+```
+
+4. Paste `SWITCH_BT_MAC`, `CONTROLLER_BT_MAC`, and `CONTROLLER_BT_PID` into `.env`. Restart:
+   `docker compose up --build`.
+5. Flash a **`pico2_w`** build. Open the play page (Watch is enough).
+
+If the scanner prints `SWITCH_BT_MAC` empty, the pad was not advertising the console address. Sleep the Switch, detach
+the pad, stand closer, retry. Hover the Pico pill if wake is not configured.
+
 ## Environment
 
 | Variable                           | Default                 | Role                                  |
@@ -123,6 +156,9 @@ Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch 
 | `CAPTURE_FORMAT`                   | `yuyv422`               | `yuyv422`, or `mjpeg` if USB chokes   |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                           |
 | `PICO_SERIAL`                      | empty                   | `/dev/ttyUSB0`                        |
+| `SWITCH_BT_MAC`                    | empty                   | From `scripts/wake-scan.py`           |
+| `CONTROLLER_BT_MAC`                | empty                   | From `scripts/wake-scan.py`           |
+| `CONTROLLER_BT_PID`                | `0x2069` (Pro 2)        | From `scripts/wake-scan.py`           |
 | `CLIENT_PORT`                      | `5000`                  | UI                                    |
 
 | Port     | What                                |

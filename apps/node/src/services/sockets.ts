@@ -9,12 +9,8 @@ export function playingCount(): number {
 	return n;
 }
 
-export function padMask(): number {
-	let flags = 0;
-	for (let i = 0; i < PAD_COUNT; i++) {
-		if (seats[i] !== null) flags |= 1 << i;
-	}
-	return flags;
+export function viewerCount(): number {
+	return viewers.size;
 }
 
 export function addViewer(ws: WebSocket): void {

@@ -44,6 +44,9 @@ services:
             MEDIA_HOST: media
             CAPTURE_SOURCE: ${CAPTURE_SOURCE}
             PICO_SERIAL: ${PICO_SERIAL}
+            SWITCH_BT_MAC: ${SWITCH_BT_MAC:-}
+            CONTROLLER_BT_MAC: ${CONTROLLER_BT_MAC:-}
+            CONTROLLER_BT_PID: ${CONTROLLER_BT_PID:-}
 
     client:
         profiles: ["all", "client"]

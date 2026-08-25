@@ -1,7 +1,16 @@
 import { Router } from "@webtools/expressapi";
 import { captureStatus } from "@/services/capture.ts";
-import { clearPad, picoStatus, setPad } from "@/services/pico.ts";
-import { addViewer, dropViewer, forEachViewer, padOf, playingCount, playPad, watchPad } from "@/services/sockets.ts";
+import { clearPad, picoStatus, setPad, setWakeHold } from "@/services/pico.ts";
+import {
+	addViewer,
+	dropViewer,
+	forEachViewer,
+	padOf,
+	playingCount,
+	playPad,
+	viewerCount,
+	watchPad,
+} from "@/services/sockets.ts";
 import type { ClientMessage, ServerMessage } from "@s2pipe/shared/types/node";
 
 function send(ws: WebSocket, message: ServerMessage): void {
@@ -26,6 +35,7 @@ async function pushStatus(): Promise<void> {
 
 function bind(ws: WebSocket): void {
 	addViewer(ws);
+	setWakeHold(viewerCount() > 0);
 
 	const greet = () => {
 		void currentStatus().then((status) => send(ws, status));
@@ -58,6 +68,7 @@ function bind(ws: WebSocket): void {
 				case "pad": {
 					const seat = padOf(ws);
 					if (seat !== undefined) setPad(seat, msg.data);
+					return;
 				}
 			}
 		} catch {
@@ -67,6 +78,7 @@ function bind(ws: WebSocket): void {
 
 	ws.addEventListener("close", () => {
 		const released = dropViewer(ws);
+		setWakeHold(viewerCount() > 0);
 		if (released === undefined) return;
 		clearPad(released);
 		void pushStatus();

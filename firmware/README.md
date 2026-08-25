@@ -15,7 +15,7 @@ cmake -S firmware -B firmware/build -DPICO_BOARD=pico2_w
 cmake --build firmware/build
 ```
 
-`PICO_BOARD`: `pico`, `pico_w`, `pico2`, `pico2_w`.
+`PICO_BOARD`: `pico`, `pico_w`, `pico2`, `pico2_w`. Sleep wake needs a **W** board.
 
 ## Pins
 
@@ -29,3 +29,7 @@ cmake --build firmware/build
 No VCC. UART1, **921600 8N1**. Adapter RX/TX LEDs show traffic.
 
 One native USB: flash from the PC, then plug the Pico into the dock. Not a COM port and pads at the same time.
+
+Sleep wake (Pico 2 W / Pico W): [README §6](../README.md#6-sleep-wake). `python3 scripts/wake-scan.py` fills `.env`.
+On-board LED lights while the wake advert is on air. Non-W boards compile; wake is a no-op. Full power-off still needs
+the console button. Switch 1 pads cannot wake a Switch 2.
