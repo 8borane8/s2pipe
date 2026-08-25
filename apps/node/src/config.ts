@@ -33,7 +33,6 @@ export const config = {
 	nodePort: envInt("NODE_PORT", 5050),
 	mediaHost: env("MEDIA_HOST", "127.0.0.1"),
 	mediaPort: 8889,
-	mediaApiPort: 9997,
 	captureSource: env("CAPTURE_SOURCE", "test"),
 	picoSerial: env("PICO_SERIAL"),
 	switchBtMac: parseMac(env("SWITCH_BT_MAC")),

@@ -185,8 +185,8 @@ deno check apps/node/src/index.ts
 deno check apps/client/src/index.ts
 ```
 
-**Media:** keep Compose. WHEP (`8889`) and the MediaMTX API (`9997`) are not published. A host node needs `8889:8889`
-and `9997:9997` on media, or MediaMTX on the machine (`MEDIA_HOST`, default `127.0.0.1`).
+**Media:** keep Compose. WHEP (`8889`) is not published. A host node needs `8889:8889` on media, or MediaMTX on the
+machine (`MEDIA_HOST`, default `127.0.0.1`).
 
 **Node:** `cd apps/node && cp .env.example .env && deno task dev` (5050). `PICO_SERIAL=/dev/ttyUSB0`.
 

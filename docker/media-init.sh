@@ -19,8 +19,7 @@ webrtcAdditionalHosts: ["${MEDIA_ICE_IP}"]
 rtmp: false
 srt: false
 playback: false
-api: true
-apiAddress: :9997
+api: false
 metrics: false
 
 paths:
