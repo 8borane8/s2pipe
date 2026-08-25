@@ -59,7 +59,9 @@ if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
 	if [ ! -e /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 ] \
 		&& [ ! -e /usr/lib64/libnvidia-encode.so.1 ] \
 		&& [ ! -e /usr/lib/aarch64-linux-gnu/libnvidia-encode.so.1 ]; then
-		real=$(find /usr/lib /usr/lib64 /host-usr-lib -name 'libnvidia-encode.so.*' -type f -print -quit 2>/dev/null || true)
+		real=$(find /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib/aarch64-linux-gnu \
+			/host-usr-lib/x86_64-linux-gnu /host-usr-lib64 /host-usr-lib/aarch64-linux-gnu \
+			-name 'libnvidia-encode.so.*' -type f -print -quit 2>/dev/null || true)
 		if [ -z "$real" ]; then
 			echo "h264_nvenc requested but libnvidia-encode.so.1 is not in the container." >&2
 			echo "Install NVIDIA Container Toolkit, then uncomment COMPOSE_FILE in .env." >&2
@@ -69,9 +71,9 @@ if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
 		ln -sfn "$real" /tmp/s2pipe-nvenc/libnvidia-encode.so.1
 		export LD_LIBRARY_PATH="/tmp/s2pipe-nvenc${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 	fi
-	# NVIDIA ULL: 1-frame VBV. FFmpeg -delay 0 drains the default NVENC async queue (~4 frames).
+	# Bookworm FFmpeg 5.1 has no -zerolatency. -delay 0 is the async queue (same job).
 	buf=$((8000000 / fps))
-	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize "$buf" -g "$fps" -bf 0 -delay 0 -zerolatency 1 -pix_fmt yuv420p)
+	video=(-c:v h264_nvenc -preset p1 -tune ull -rc cbr -b:v 8M -maxrate 8M -bufsize "$buf" -g "$fps" -bf 0 -delay 0 -pix_fmt yuv420p)
 fi
 
 case "$CAPTURE_SOURCE" in
