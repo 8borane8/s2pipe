@@ -1,6 +1,12 @@
+# NVENC overlay. Enable from .env: COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml
+# Needs NVIDIA Container Toolkit. Overlay without a GPU = media exits.
+
 services:
     media:
         environment:
             FFMPEG_ENCODER: h264_nvenc
+            NVIDIA_VISIBLE_DEVICES: all
             NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
         gpus: all
+        volumes:
+            - /usr/lib:/host-usr-lib:ro

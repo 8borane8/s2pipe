@@ -50,31 +50,24 @@ fps="${CAPTURE_FPS}"
 opus=(-c:a libopus -application lowdelay -b:a 64k -ar 48000 -ac 2)
 rtsp_audio=(-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch-audio)
 
-input=()
-video=()
-extra=()
 apid=""
 
-if [ -n "$FFMPEG_EXTRA" ]; then
-	# shellcheck disable=SC2206
-	extra=( $FFMPEG_EXTRA )
-fi
-
 video=(-c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -bf 0 -g "$fps" -keyint_min "$fps" -pix_fmt yuv420p -b:v 6M -maxrate 6M -bufsize 2M)
-if [ "$FFMPEG_ENCODER" = "h264_nvenc" ]; then
-	nvenc=""
-	for f in /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 \
-		/usr/lib/wsl/lib/libnvidia-encode.so.1 \
-		/usr/local/nvidia/lib64/libnvidia-encode.so.1; do
-		if [ -e "$f" ]; then
-			nvenc=$f
-			export LD_LIBRARY_PATH="$(dirname "$f")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-			break
+if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
+	# Toolkit should inject encode with NVIDIA_DRIVER_CAPABILITIES=video. If it
+	# only mounts a versioned .so, point the soname at it from the host bind-mount.
+	if [ ! -e /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 ] \
+		&& [ ! -e /usr/lib64/libnvidia-encode.so.1 ] \
+		&& [ ! -e /usr/lib/aarch64-linux-gnu/libnvidia-encode.so.1 ]; then
+		real=$(find /usr/lib /usr/lib64 /host-usr-lib -name 'libnvidia-encode.so.*' -type f -print -quit 2>/dev/null || true)
+		if [ -z "$real" ]; then
+			echo "h264_nvenc requested but libnvidia-encode.so.1 is not in the container." >&2
+			echo "Install NVIDIA Container Toolkit, then uncomment COMPOSE_FILE in .env." >&2
+			exit 1
 		fi
-	done
-	if [ -z "$nvenc" ]; then
-		echo "h264_nvenc requested but libnvidia-encode.so.1 is missing." >&2
-		exit 1
+		mkdir -p /tmp/s2pipe-nvenc
+		ln -sfn "$real" /tmp/s2pipe-nvenc/libnvidia-encode.so.1
+		export LD_LIBRARY_PATH="/tmp/s2pipe-nvenc${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 	fi
 	# NVIDIA ULL: 1-frame VBV. FFmpeg -delay 0 drains the default NVENC async queue (~4 frames).
 	buf=$((8000000 / fps))
@@ -93,9 +86,8 @@ case "$CAPTURE_SOURCE" in
 			ls -l /dev/video* 2>/dev/null || echo "(no /dev/video*)" >&2
 			exit 1
 		fi
-		# Uncompressed YUY2 1080p60 is ~2 Gb/s; USB (and usbipd) drops frames.
-		# UVC HDMI dongles speak MJPEG. Override with CAPTURE_FORMAT=yuyv if needed.
-		fmt="${CAPTURE_FORMAT:-mjpeg}"
+		# Uncompressed YUY2 1080p60 is ~2 Gb/s; USB drops frames. Use mjpeg if it chokes.
+		fmt="${CAPTURE_FORMAT:-yuyv422}"
 		input=(-f v4l2 -input_format "$fmt" -framerate "$fps" -video_size "$size" -i "$CAPTURE_DEVICE")
 		if [ -n "$CAPTURE_AUDIO" ]; then
 			ffmpeg -use_wallclock_as_timestamps 1 -f alsa -i "$CAPTURE_AUDIO" "${opus[@]}" "${rtsp_audio[@]}" &
@@ -126,7 +118,7 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-ffmpeg "${input[@]}" "${video[@]}" -an "${extra[@]}" \
+ffmpeg "${input[@]}" "${video[@]}" -an \
 	-f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch &
 ffpid=$!
 wait "$ffpid" || true

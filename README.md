@@ -1,9 +1,12 @@
 # s2pipe
 
-Self-hosted Switch 2 cloud play. The console stays on the capture PC. Up to four browsers see the picture over WebRTC
-and play with a gamepad or keyboard. Inputs go to a Raspberry Pico that shows up on the Switch as 4 USB pads.
+Self-hosted Switch 2 cloud play. The console stays on the Linux capture PC. Up to four browsers see the picture over
+WebRTC and play with a gamepad or keyboard. Inputs go to a Raspberry Pico that shows up on the Switch as 4 USB pads.
 
 No cloud, no subscription, no client to install. **No auth.** Trusted LAN only. Do not expose this on the Internet.
+
+**Linux is the supported host.** Plug the capture card and the Pico UART into the machine that runs Docker. Windows via
+usbipd is possible but discouraged (see [Windows](#windows-discouraged)).
 
 ```
 Switch 2 --HDMI--> capture --USB--> media (FFmpeg + MediaMTX)
@@ -27,17 +30,10 @@ Equivalents are fine.
 - [Raspberry Pico 2 W](https://amzn.eu/d/09YZSwVw) — board `pico2_w`
 - [CP2102 UART adapter HW-598](https://amzn.eu/d/0catDsov) — jumper **3.3 V**, **no VCC** on the Pico (TX / RX / GND
   only)
-- [XIIXMASK HDMI USB 3.0 capture](https://amzn.eu/d/09Xc9GcE) — UVC webcam (MJPEG), HDMI in + loop
-- Switch 2 + dock, PC, [Docker](https://docs.docker.com/get-docker/) Compose
+- [XIIXMASK HDMI USB 3.0 capture](https://amzn.eu/d/09Xc9GcE) — UVC webcam, HDMI in + loop
+- Switch 2 + dock, a Linux PC, [Docker Engine + Compose](https://docs.docker.com/engine/install/)
 
-## 2. UART driver (Windows)
-
-Chip is **Silicon Labs CP2102**. If you have no `COMx`:
-[CP210x VCP](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers).
-
-Linux: `cp210x` is already in the kernel -> `/dev/ttyUSB0`.
-
-## 3. Flash the Pico
+## 2. Flash the Pico
 
 1. Download `s2pipe_pico.uf2` from [Releases](https://github.com/8borane8/s2pipe/releases) (no SDK needed).
 2. Hold **BOOTSEL**, plug the Pico into the PC, drop the `.uf2`.
@@ -45,7 +41,7 @@ Linux: `cp210x` is already in the kernel -> `/dev/ttyUSB0`.
 
 Local build: [firmware/README.md](firmware/README.md).
 
-## 4. Wiring
+## 3. Wiring
 
 One native USB: flash from the PC, then plug into the dock. Not a COM port and pads at the same time.
 
@@ -62,113 +58,53 @@ Switch dock USB  --> Pico USB
 | GND      | GND                                |
 
 Power from Switch USB. **Leave adapter VCC disconnected** (5 V on a GPIO kills the Pico). CP2102 jumper on **3.3 V**.
+In-tree `cp210x` -> `/dev/ttyUSB0`. UART **921600 8N1**. If the adapter cannot do 921600, set 500000 in both `UART_BAUD`
+(`firmware/main.c`) and `SERIAL_BAUD` (`apps/node/src/services/pico.ts`).
 
-Local test without the node (Windows, one Xbox):
+## 4. Run
 
-```sh
-pip install pyserial
-python scripts/pico_controller.py COM3
-```
-
-**Tab** cycles P1->P4. **1–4** (numpad too) pick the seat. **H** is Home. Other pads stay neutral. CP2102 RX/TX LEDs
-should blink.
-
-## 5. Compose
+Install [Docker Engine](https://docs.docker.com/engine/install/) (not Desktop) and the Compose plugin.
 
 ```sh
 cp .env.example .env
 ```
 
-**This PC only:** leave `localhost`.
+Edit `.env`:
 
-**Other machines on the LAN:** capture PC IP, never `127.0.0.1`, never the Docker name `node`:
+|               | `.env`                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------- |
+| This PC only  | leave `localhost`                                                                       |
+| Other LAN PCs | `NODE_BASE_URL=http://192.168.1.20:5050` and `MEDIA_ICE_IP=192.168.1.20`                |
+| HDMI          | `CAPTURE_SOURCE=v4l2` — UVC webcam, `ls /dev/video*` (`CAPTURE_DEVICE` if not `video0`) |
+| Color bars    | leave `CAPTURE_SOURCE=test`                                                             |
+| Pico          | `PICO_SERIAL=/dev/ttyUSB0` (`ls /dev/ttyUSB*`). No Pico = video only                    |
+| HDMI audio    | `CAPTURE_AUDIO=hw:0,0` after `cat /proc/asound/cards`. Empty = silence                  |
 
-```
-NODE_BASE_URL=http://192.168.1.20:5050
-MEDIA_ICE_IP=192.168.1.20
-```
-
-The browser must reach both `NODE_BASE_URL` and `MEDIA_ICE_IP:MEDIA_ICE_PORT` (UDP).
-
-**Video**
-
-|                      | `.env`                                                 |
-| -------------------- | ------------------------------------------------------ |
-| Color bars (no card) | `CAPTURE_SOURCE=test`                                  |
-| Real HDMI            | `CAPTURE_SOURCE=v4l2` and `CAPTURE_DEVICE=/dev/video0` |
-
-The card must show up as a webcam. Some Windows-only “Game Capture” boxes never get `/dev/video0`.
-
-- **Linux:** plug the card in. Compose maps `/dev` (privileged). If it is not `video0`, set
-  `CAPTURE_DEVICE=/dev/videoN`.
-- **Windows:** Docker Desktop cannot see USB by itself. You must **attach** through a real WSL distro (Ubuntu). Do not
-  use `--distribution docker-desktop`.
-
-```powershell
-wsl --update
-wsl --install -d Ubuntu
-winget install --interactive --exact dorssel.usbipd-win
-.\scripts\usb.ps1 -List
-.\scripts\usb.ps1 -BusId 2-4
-```
-
-`usbipd list` must show **Attached**, not only Shared. The serial adapter usually becomes `/dev/ttyUSB0`. The HDMI card
-often has **no** `/dev/video0`: the stock WSL kernel has no UVC. While attached, Windows cannot use that port.
-
-After attach (and after Compose is up), **open a WSL window once** (`wsl` or the Ubuntu app). Compose does not see the
-attached USB devices until that distro is actually running. You can close the WSL window right after. Why this is needed
-is unclear; without it, `/dev/ttyUSB0` and the capture card stay invisible to the containers.
-
-**usbipd adds latency.** It tunnels USB into WSL (capture card + UART). Extra hops, extra jitter. The same setup on
-**Linux** is faster: plug the card and the Pico UART into the machine that runs Compose, no usbipd. Windows is fine to
-try the stack; for play, prefer Linux.
-
-**Audio** (HDMI sound from the card)
-
-Video is `/dev/video0`. HDMI audio is a **separate ALSA device**. Empty `CAPTURE_AUDIO` = silence. To send sound to the
-browser:
+`mjpeg` in `CAPTURE_FORMAT` if USB drops uncompressed frames. The browser must reach `NODE_BASE_URL` and
+`MEDIA_ICE_IP:MEDIA_ICE_PORT` (UDP). Click the video once if autoplay is blocked.
 
 ```sh
-docker compose --profile node exec media cat /proc/asound/cards
+docker compose up --build
 ```
 
-Set `CAPTURE_AUDIO` (e.g. `hw:0,0`). Restart media. Click the video once if the browser blocks autoplay.
-
-**Pico** (without it, video works, Play does nothing on the Switch)
-
-`PICO_SERIAL=/dev/ttyUSB0` in Compose (Linux **and** Windows). On Windows attach the UART adapter with
-`.\scripts\usb.ps1` too, not `COM3`: the node is Linux.
-
-CPU:
+NVENC: host needs `nvidia-smi`, `libnvidia-encode.so.1` (`ldconfig -p | grep libnvidia-encode`), and the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html):
 
 ```sh
-docker compose --profile all up --build
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
 ```
 
-NVIDIA (`h264_nvenc`):
+Uncomment `COMPOSE_FILE` in `.env`, then the same `docker compose up --build`. Do not install encode packages inside the
+image — FFmpeg loads the host driver.
 
-```sh
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile all up --build
-```
+`.env` sets `COMPOSE_PROFILES=all`. Media + node only: `COMPOSE_PROFILES=node`. Client only: `COMPOSE_PROFILES=client`.
+Stop: Ctrl+C or `docker compose down`.
 
-Needs an NVIDIA GPU and Docker GPU access
-([NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/index.html) on
-Linux; Docker Desktop WSL2 + driver on Windows).
+## 5. Play
 
-Node + media only: `--profile node`.
-
-**Stop (Windows):** do not only close the terminal. FFmpeg can keep `/dev/video0` and freeze usbipd.
-
-```powershell
-.\scripts\stop.ps1
-```
-
-Still stuck: `.\scripts\stop.ps1 -WslShutdown` (restarts WSL, not the PC). Then re-attach USB.
-
-## 6. Play
-
-Open [http://localhost:5000](http://localhost:5000). With `--profile all`, the client uses `NODE_BASE_URL` and skips the
-connect page.
+Open [http://localhost:5000](http://localhost:5000). The client container uses `NODE_BASE_URL` and skips the connect
+page.
 
 Start in **Watch**. **Play** takes a Pico seat (max 4). **Watch** releases it. Pick a gamepad at the bottom. Esc =
 settings. The HUD stays on until fullscreen.
@@ -177,19 +113,17 @@ Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch 
 
 ## Environment
 
-| Variable                           | Default                 | Role                                          |
-| ---------------------------------- | ----------------------- | --------------------------------------------- |
-| `NODE_PORT`                        | `5050`                  | Node HTTP                                     |
-| `NODE_BASE_URL`                    | `http://localhost:5050` | URL the **browser** uses for the node         |
-| `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE (UDP)                                     |
-| `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                              |
-| `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2; ALSA HDMI (`hw:0,0`) or silence         |
-| `CAPTURE_FORMAT`                   | `yuyv422`               | V4L2/FFmpeg format (`yuyv422`, or `mjpeg` if USB chokes) |
-| `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                                   |
-| `FFMPEG_ENCODER`                   | `libx264`               | `libx264` or `h264_nvenc` (GPU overlay)       |
-| `FFMPEG_EXTRA`                     | empty                   | Extra FFmpeg args                             |
-| `PICO_SERIAL`                      | empty                   | `/dev/ttyUSB0` in Compose                     |
-| `CLIENT_PORT`                      | `5000`                  | UI                                            |
+| Variable                           | Default                 | Role                                  |
+| ---------------------------------- | ----------------------- | ------------------------------------- |
+| `NODE_PORT`                        | `5050`                  | Node HTTP                             |
+| `NODE_BASE_URL`                    | `http://localhost:5050` | URL the **browser** uses for the node |
+| `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE (UDP)                             |
+| `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                      |
+| `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2; ALSA HDMI (`hw:0,0`) or silence |
+| `CAPTURE_FORMAT`                   | `yuyv422`               | `yuyv422`, or `mjpeg` if USB chokes   |
+| `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                           |
+| `PICO_SERIAL`                      | empty                   | `/dev/ttyUSB0`                        |
+| `CLIENT_PORT`                      | `5000`                  | UI                                    |
 
 | Port     | What                                |
 | -------- | ----------------------------------- |
@@ -197,8 +131,11 @@ Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch 
 | 5050     | Node: health, WebSocket, WHEP proxy |
 | 8189 UDP | WebRTC ICE / RTP                    |
 
-The node opens **921600 8N1**. If the adapter cannot do 921600, use 500000 in both `UART_BAUD` (`firmware/main.c`)
-**and** `SERIAL_BAUD` (`apps/node/src/services/pico.ts`). 250 ms UART silence -> pads go neutral.
+## Windows (discouraged)
+
+Not optimized for Windows. Docker Desktop cannot see USB. [usbipd-win](https://github.com/dorssel/usbipd-win) can tunnel
+the capture card and UART into WSL, but that extra hop adds **video latency and jitter**. The stock WSL kernel often has
+no UVC, so `/dev/video0` never appears. Use a Linux capture PC.
 
 ## Development
 
@@ -213,8 +150,7 @@ deno check apps/client/src/index.ts
 **Media:** keep Compose. WHEP (`8889`) is not published. A host node needs `8889:8889` on media, or MediaMTX on the
 machine (`MEDIA_HOST`, default `127.0.0.1`).
 
-**Node:** `cd apps/node && cp .env.example .env && deno task dev` (5050). `PICO_SERIAL`: `COM3` on a Windows host,
-`/dev/ttyUSB0` on Linux.
+**Node:** `cd apps/node && cp .env.example .env && deno task dev` (5050). `PICO_SERIAL=/dev/ttyUSB0`.
 
 **Client:** `cd apps/client && cp .env.example .env && deno task dev` (5000). No `NODE_BASE_URL` -> connect page.
 

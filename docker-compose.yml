@@ -11,8 +11,6 @@ services:
             dockerfile: docker/Dockerfile.media
         ports:
             - "${MEDIA_ICE_PORT}:${MEDIA_ICE_PORT}/udp"
-        # Linux and Windows (after usb.ps1): capture card + UART. Replaces a single
-        # /dev/video0 device map so Compose still starts with CAPTURE_SOURCE=test.
         privileged: true
         volumes:
             - /dev:/dev
@@ -26,8 +24,6 @@ services:
             CAPTURE_WIDTH: ${CAPTURE_WIDTH}
             CAPTURE_HEIGHT: ${CAPTURE_HEIGHT}
             CAPTURE_FPS: ${CAPTURE_FPS}
-            FFMPEG_ENCODER: ${FFMPEG_ENCODER}
-            FFMPEG_EXTRA: ${FFMPEG_EXTRA}
 
     node:
         profiles: ["all", "node"]
@@ -40,7 +36,6 @@ services:
             dockerfile: docker/Dockerfile.node
         ports:
             - "${NODE_PORT}:${NODE_PORT}"
-        # Same /dev map as media (Pico UART = /dev/ttyUSB0)
         privileged: true
         volumes:
             - /dev:/dev
