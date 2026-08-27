@@ -22,6 +22,11 @@ playback: false
 api: false
 metrics: false
 
+# Needed to prevent deadlocks
+writeQueueSize: 2048
+writeTimeout: 10s
+readTimeout: 10s
+
 paths:
   switch:
     source: publisher
@@ -100,6 +105,6 @@ elif [ -n "${CAPTURE_AUDIO:-}" ]; then
     ffmpeg -hide_banner -loglevel error -use_wallclock_as_timestamps 1 -f alsa -i "$CAPTURE_AUDIO" "${opus[@]}" "${rtsp_audio[@]}" &
 fi
 
-# 5. Unique video FFmpeg launch (if it crashes, the script stops)
+# 5. FFmpeg video stream launch
 ffmpeg -hide_banner -nostats -loglevel info "${input[@]}" "${video[@]}" -an \
     -f rtsp -rtsp_transport udp rtsp://127.0.0.1:8554/switch

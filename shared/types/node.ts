@@ -27,8 +27,10 @@ export type NodeStatus = {
 export type ClientMessage =
 	| { op: "play" }
 	| { op: "watch" }
-	| { op: "pad"; data: PadState };
+	| { op: "pad"; data: PadState }
+	| { op: "pong" };
 
 export type ServerMessage =
 	| { op: "status"; data: StatusData }
-	| { op: "play"; data: { playing: boolean } };
+	| { op: "play"; data: { playing: boolean } }
+	| { op: "ping" };

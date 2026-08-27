@@ -13,6 +13,8 @@ import {
 } from "@/services/sockets.ts";
 import type { ClientMessage, ServerMessage } from "@s2pipe/shared/types/node";
 
+const HEARTBEAT_INTERVAL = 30_000;
+
 let lastCapture = "";
 
 function send(ws: WebSocket, message: ServerMessage): void {
@@ -48,6 +50,10 @@ setInterval(() => {
 function bind(ws: WebSocket): void {
 	addViewer(ws);
 	setWakeHold(viewerCount() > 0);
+
+	const heartbeat = setInterval(() => {
+		send(ws, { op: "ping" });
+	}, HEARTBEAT_INTERVAL);
 
 	const greet = () => {
 		void currentStatus().then((status) => send(ws, status));
@@ -89,6 +95,7 @@ function bind(ws: WebSocket): void {
 	});
 
 	ws.addEventListener("close", () => {
+		clearInterval(heartbeat);
 		const released = dropViewer(ws);
 		setWakeHold(viewerCount() > 0);
 		if (released === undefined) return;
@@ -106,7 +113,8 @@ export default new Router()
 			});
 		}
 
-		const { socket, response } = Deno.upgradeWebSocket(req.raw, { idleTimeout: 0 });
+		const { socket, response } = Deno.upgradeWebSocket(req.raw);
 		bind(socket);
+
 		return response;
 	});

@@ -203,6 +203,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						if (!msg.data.capture.running) live.value = false;
 						pico.value = msg.data.pico;
 						playingCount.value = msg.data.playing;
+					} else if (msg.op === "ping") {
+						send(socket, { op: "pong" });
 					}
 				} catch {
 					// Ignorer les messages invalides
