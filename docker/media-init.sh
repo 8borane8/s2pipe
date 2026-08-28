@@ -2,10 +2,6 @@
 
 set -euo pipefail
 
-sysctl -w net.core.rmem_max=26214400 2>/dev/null || true
-sysctl -w net.core.wmem_max=26214400 2>/dev/null || true
-ulimit -n 65535
-
 # 1. Generate MediaMTX config
 yaml=/tmp/s2pipe-mediamtx.yml
 cat > "$yaml" <<EOF
@@ -26,7 +22,6 @@ playback: false
 api: false
 metrics: false
 
-readBufferCount: 8192
 writeQueueSize: 8192
 writeTimeout: 10s
 readTimeout: 10s
@@ -66,11 +61,12 @@ fps="${CAPTURE_FPS}"
 
 video_encoder=(
     -c:v libx264 
-    -preset ultrafast 
-    -profile:v high 
+    -preset ultrafast
+    -tune zerolatency
+    -profile:v high
     -fps_mode cfr
     -r "$fps"
-    -bf 0 
+    -bf 0
     -g "$fps" 
     -keyint_min "$fps" 
     -sc_threshold 0
@@ -99,7 +95,7 @@ if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
     video_encoder=(
         -c:v h264_nvenc
         -preset p1
-        -tune ll
+        -tune ull
         -profile:v high
         -rc cbr
         -b:v 8M
@@ -109,7 +105,6 @@ if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
         -keyint_min "$fps"
         -force_key_frames "expr:gte(t,n_forced*1)"
         -fps_mode cfr -r "$fps"
-        -no-scenecut 1
         -bf 0
         -delay 0
         -pix_fmt yuv420p
@@ -145,6 +140,53 @@ test)
     ;;
 esac
 
+# RTSP output options
+rtsp_out_opts=(-f rtsp -rtsp_transport tcp)
+
+# ---------------------------------------------------------------------------
+# Watchdog: some freezes (v4l2 device hanging, signal loss, USB driver
+# bug...) leave ffmpeg alive but stuck in a blocking read()/write(). In that
+# case the classic retry loop (based on the process exiting) never triggers,
+# which is exactly the symptom described: a manual `killall -9 ffmpeg` is
+# needed to get things going again.
+#
+# We have ffmpeg write its status (-progress) to a file, and watch that
+# file's modification time in parallel. If it stops changing for
+# STALL_TIMEOUT seconds, we kill -9 the process ourselves: the existing
+# retry loop then takes over automatically, in near real time.
+# ---------------------------------------------------------------------------
+run_ffmpeg_with_watchdog() {
+    local stall_timeout=4
+    local progress_file
+    progress_file=$(mktemp /tmp/s2pipe-progress.XXXXXX)
+
+    ffmpeg -hide_banner -nostats -progress "$progress_file" "$@" &
+    local ffmpeg_pid=$!
+
+    (
+        while kill -0 "$ffmpeg_pid" 2>/dev/null; do
+            sleep 2
+            [ -f "$progress_file" ] || continue
+            now=$(date +%s)
+            last=$(stat -c %Y "$progress_file" 2>/dev/null || echo "$now")
+            if (( now - last > stall_timeout )); then
+                echo "ffmpeg (pid $ffmpeg_pid) is not progressing anymore since ${stall_timeout}s, kill -9" >&2
+                kill -9 "$ffmpeg_pid" 2>/dev/null || true
+                break
+            fi
+        done
+    ) &
+    local watchdog_pid=$!
+
+    wait "$ffmpeg_pid" 2>/dev/null
+    local rc=$?
+
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+    rm -f "$progress_file"
+    return "$rc"
+}
+
 # Background audio launch if needed
 if ((${#audio[@]})); then
     while :; do
@@ -152,10 +194,10 @@ if ((${#audio[@]})); then
         if [ "$CAPTURE_SOURCE" = "v4l2" ]; then
             arecord -D "$CAPTURE_AUDIO" -f S16_LE -c 2 -r 48000 -t raw |
                 ffmpeg -hide_banner -nostats -loglevel error "${audio[@]}" "${audio_encoder[@]}" \
-                    -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio || true
+                    "${rtsp_out_opts[@]}" rtsp://127.0.0.1:8554/switch-audio || true
         else
             ffmpeg -hide_banner -nostats -loglevel error "${audio[@]}" "${audio_encoder[@]}" \
-                -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch-audio || true
+                "${rtsp_out_opts[@]}" rtsp://127.0.0.1:8554/switch-audio || true
         fi
 
         echo "Audio publisher stopped; retrying in 1 second." >&2
@@ -163,12 +205,12 @@ if ((${#audio[@]})); then
     done &
 fi
 
-
-# FFmpeg video stream launch
+# FFmpeg video stream launch (avec watchdog anti-blocage)
 while :; do
     echo "Starting video publisher on ${CAPTURE_DEVICE:-test source}." >&2
-    ffmpeg -hide_banner -nostats -loglevel verbose "${video[@]}" "${video_encoder[@]}" -an \
-        -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/switch || true
+    run_ffmpeg_with_watchdog \
+        -loglevel info "${video[@]}" "${video_encoder[@]}" -an \
+        "${rtsp_out_opts[@]}" rtsp://127.0.0.1:8554/switch || true
 
     echo "Video publisher stopped; retrying in 1 second." >&2
     sleep 1
