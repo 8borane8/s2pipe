@@ -150,41 +150,43 @@ rtsp_out_opts=(-f rtsp -rtsp_transport tcp)
 # which is exactly the symptom described: a manual `killall -9 ffmpeg` is
 # needed to get things going again.
 #
-# We have ffmpeg write its status (-progress) to a file, and watch that
-# file's modification time in parallel. If it stops changing for
-# STALL_TIMEOUT seconds, we kill -9 the process ourselves: the existing
+# We read FFmpeg's status (-progress) from a pipe. If no status line arrives
+# for STALL_TIMEOUT seconds, we kill -9 the process ourselves: the existing
 # retry loop then takes over automatically, in near real time.
 # ---------------------------------------------------------------------------
 run_ffmpeg_with_watchdog() {
-    local stall_timeout=4
-    local progress_file
-    progress_file=$(mktemp /tmp/s2pipe-progress.XXXXXX)
+    local stall_timeout=10
+    local fifo="/tmp/ffmpeg_watchdog_$$"
+    
+    mkfifo "$fifo"
+    exec 3<>"$fifo"
+    rm -f "$fifo"
 
-    ffmpeg -hide_banner -nostats -progress "$progress_file" "$@" &
+    ffmpeg \
+        -hide_banner \
+        -nostats \
+        -progress /dev/fd/3 \
+        "$@" 2>&2 &
     local ffmpeg_pid=$!
 
-    (
-        while kill -0 "$ffmpeg_pid" 2>/dev/null; do
-            sleep 2
-            [ -f "$progress_file" ] || continue
-            now=$(date +%s)
-            last=$(stat -c %Y "$progress_file" 2>/dev/null || echo "$now")
-            if (( now - last > stall_timeout )); then
-                echo "ffmpeg (pid $ffmpeg_pid) is not progressing anymore since ${stall_timeout}s, kill -9" >&2
-                kill -9 "$ffmpeg_pid" 2>/dev/null || true
-                break
-            fi
-        done
-    ) &
-    local watchdog_pid=$!
+    local line
+    local status=0
 
-    wait "$ffmpeg_pid" 2>/dev/null
-    local rc=$?
+    while kill -0 "$ffmpeg_pid" 2>/dev/null; do
+        if read -r -t "$stall_timeout" line <&3; then
+            continue
+        else
+            echo "[!] WATCHDOG: Freeze détecté (PID: $ffmpeg_pid) !" >&2
+            kill -9 "$ffmpeg_pid" 2>/dev/null
+            status=1
+            break
+        fi
+    done
 
-    kill "$watchdog_pid" 2>/dev/null || true
-    wait "$watchdog_pid" 2>/dev/null || true
-    rm -f "$progress_file"
-    return "$rc"
+    exec 3<&-
+    exec 3>&-
+    wait "$ffmpeg_pid" 2>/dev/null || true
+    return $status
 }
 
 # Background audio launch if needed
@@ -209,7 +211,7 @@ fi
 while :; do
     echo "Starting video publisher on ${CAPTURE_DEVICE:-test source}." >&2
     run_ffmpeg_with_watchdog \
-        -loglevel info "${video[@]}" "${video_encoder[@]}" -an \
+        -loglevel debug "${video[@]}" "${video_encoder[@]}" -an \
         "${rtsp_out_opts[@]}" rtsp://127.0.0.1:8554/switch || true
 
     echo "Video publisher stopped; retrying in 1 second." >&2
