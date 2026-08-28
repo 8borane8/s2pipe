@@ -1,24 +1,36 @@
 FROM debian:bookworm-slim
 
-ARG MEDIAMTX_VERSION=1.15.3
+ARG MEDIAMTX_VERSION=1.20.1
+ARG FFMPEG_VERSION=9.0
 
-RUN apt-get update \
-	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-		ca-certificates \
-		curl \
-		ffmpeg \
-		psmisc \
-		v4l-utils \
-	&& arch="$(dpkg --print-architecture)" \
-	&& case "$arch" in \
-		amd64) mtx_arch="linux_amd64" ;; \
-		arm64) mtx_arch="linux_arm64" ;; \
-		*) echo "unsupported architecture: $arch" && exit 1 ;; \
-	esac \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+		alsa-utils \
+        xz-utils \
+
+    && arch="$(dpkg --print-architecture)" \
+    && case "$arch" in \
+        amd64) mtx_arch="linux_amd64" ; ffmpeg_arch="64" ;; \
+        arm64) mtx_arch="linux_arm64" ; ffmpeg_arch="arm64" ;; \
+        *) echo "Architecture non supportée: $arch" && exit 1 ;; \
+    esac \
+
 	&& curl -fsSL "https://github.com/bluenviron/mediamtx/releases/download/v${MEDIAMTX_VERSION}/mediamtx_v${MEDIAMTX_VERSION}_${mtx_arch}.tar.gz" \
-		| tar -xz -C /usr/local/bin mediamtx \
-	&& rm -rf /var/lib/apt/lists/*
+        | tar -xz -C /usr/local/bin mediamtx \
+
+	&& curl -fsSL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n${FFMPEG_VERSION}-latest-linux${ffmpeg_arch}-gpl-${FFMPEG_VERSION}.tar.xz" \
+        | tar -xJ -C /tmp \
+    && mv /tmp/ffmpeg-n${FFMPEG_VERSION}-latest-linux${ffmpeg_arch}-gpl-${FFMPEG_VERSION}/bin/ffmpeg /usr/local/bin/ \
+    && mv /tmp/ffmpeg-n${FFMPEG_VERSION}-latest-linux${ffmpeg_arch}-gpl-${FFMPEG_VERSION}/bin/ffprobe /usr/local/bin/ \
+
+    && apt-get purge -y curl xz-utils \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
 
 COPY docker/media-init.sh /media-init.sh
+RUN chmod +x /media-init.sh
 
 ENTRYPOINT ["/bin/bash", "/media-init.sh"]

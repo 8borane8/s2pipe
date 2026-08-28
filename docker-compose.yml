@@ -6,6 +6,7 @@ services:
         restart: unless-stopped
         init: true
         stop_grace_period: 20s
+        shm_size: '2gb'
         build:
             context: .
             dockerfile: docker/Dockerfile.media
