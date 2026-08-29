@@ -174,6 +174,20 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		};
 	}, [nodeUrl]);
 
+	useEffect(() => {
+		// deno-lint-ignore no-explicit-any
+		const video = videoRef.current as any;
+		if (!video) return;
+		const onEnd = () => { fullscreen.value = false; };
+		const onBegin = () => { fullscreen.value = true; settings.value = false; };
+		video.addEventListener("webkitendfullscreen", onEnd);
+		video.addEventListener("webkitbeginfullscreen", onBegin);
+		return () => {
+			video.removeEventListener("webkitendfullscreen", onEnd);
+			video.removeEventListener("webkitbeginfullscreen", onBegin);
+		};
+	}, []);
+
 	// Gestion WebSocket (Statut et Commandes)
 	useEffect(() => {
 		let socket: WebSocket | null = null;
@@ -349,6 +363,12 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}
 
 	function toggleFullscreen(): void {
+		// deno-lint-ignore no-explicit-any
+		const video = videoRef.current as any;
+		if (video?.webkitEnterFullscreen && !document.fullscreenEnabled) {
+			video.webkitEnterFullscreen();
+			return;
+		}
 		if (document.fullscreenElement) {
 			void document.exitFullscreen();
 		} else {
