@@ -155,40 +155,62 @@ rtsp_out_opts=(-f rtsp -rtsp_transport tcp)
 # retry loop then takes over automatically, in near real time.
 # ---------------------------------------------------------------------------
 run_ffmpeg_with_watchdog() {
-    local timeout=10
-    local fifo pid wd
+    local stall_timeout=10
+    local progress_fifo
+    local ffmpeg_pid
+    local watchdog_pid
 
-    fifo=$(mktemp -u /tmp/ffp.XXXXXX)
-    mkfifo "$fifo"
+    progress_fifo=$(mktemp -u /tmp/ffmpeg-progress.XXXXXX)
+    mkfifo "$progress_fifo"
 
-    ffmpeg -progress "$fifo" "$@" &
-    pid=$!
+    ffmpeg -progress "$progress_fifo" "$@" &
+    ffmpeg_pid=$!
+
+    echo "FFmpeg PID=$ffmpeg_pid" >&2
 
     (
-        local last=$(date +%s)
+        local last_frame=-1
+        local last_change
         local line
+        local frame
 
-        exec 3<"$fifo"
+        last_change=$(date +%s)
 
-        while kill -0 "$pid" 2>/dev/null; do
+        exec 3<"$progress_fifo"
+
+        while kill -0 "$ffmpeg_pid" 2>/dev/null; do
+
             if IFS= read -r -t 1 line <&3; then
-                [[ $line == frame=* ]] && last=$(date +%s)
-            elif (( $(date +%s) - last >= timeout )); then
-                echo "WATCHDOG: FFmpeg frozen, killing $pid" >&2
-                kill -9 "$pid" 2>/dev/null
+                case "$line" in
+                    frame=*)
+                        frame="${line#frame=}"
+
+                        if [[ "$frame" != "$last_frame" ]]; then
+                            last_frame="$frame"
+                            last_change=$(date +%s)
+                        fi
+                        ;;
+                esac
+            fi
+
+            if (( $(date +%s) - last_change >= stall_timeout )); then
+                echo "WATCHDOG: FFmpeg frozen, killing $ffmpeg_pid" >&2
+                kill -9 "$ffmpeg_pid" 2>/dev/null || true
                 break
             fi
         done
 
         exec 3<&-
     ) &
-    wd=$!
+    watchdog_pid=$!
 
-    wait "$pid" 2>/dev/null || true
-    kill "$wd" 2>/dev/null || true
-    wait "$wd" 2>/dev/null || true
+    wait "$ffmpeg_pid" 2>/dev/null || true
 
-    rm -f "$fifo"
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+
+    rm -f "$progress_fifo"
+
     return 1
 }
 
