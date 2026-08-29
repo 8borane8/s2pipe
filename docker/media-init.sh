@@ -155,38 +155,41 @@ rtsp_out_opts=(-f rtsp -rtsp_transport tcp)
 # retry loop then takes over automatically, in near real time.
 # ---------------------------------------------------------------------------
 run_ffmpeg_with_watchdog() {
-    local stall_timeout=10
-    local fifo="/tmp/ffmpeg_watchdog_$$"
-    
+    local timeout=10
+    local fifo pid wd
+
+    fifo=$(mktemp -u /tmp/ffp.XXXXXX)
     mkfifo "$fifo"
-    exec 3<>"$fifo"
+
+    ffmpeg -progress "$fifo" "$@" &
+    pid=$!
+
+    (
+        local last=$(date +%s)
+        local line
+
+        exec 3<"$fifo"
+
+        while kill -0 "$pid" 2>/dev/null; do
+            if IFS= read -r -t 1 line <&3; then
+                [[ $line == frame=* ]] && last=$(date +%s)
+            elif (( $(date +%s) - last >= timeout )); then
+                echo "WATCHDOG: FFmpeg frozen, killing $pid" >&2
+                kill -9 "$pid" 2>/dev/null
+                break
+            fi
+        done
+
+        exec 3<&-
+    ) &
+    wd=$!
+
+    wait "$pid" 2>/dev/null || true
+    kill "$wd" 2>/dev/null || true
+    wait "$wd" 2>/dev/null || true
+
     rm -f "$fifo"
-
-    ffmpeg \
-        -hide_banner \
-        -nostats \
-        -progress /dev/fd/3 \
-        "$@" 2>&2 &
-    local ffmpeg_pid=$!
-
-    local line
-    local status=0
-
-    while kill -0 "$ffmpeg_pid" 2>/dev/null; do
-        if read -r -t "$stall_timeout" line <&3; then
-            continue
-        else
-            echo "[!] WATCHDOG: Freeze détecté (PID: $ffmpeg_pid) !" >&2
-            kill -9 "$ffmpeg_pid" 2>/dev/null
-            status=1
-            break
-        fi
-    done
-
-    exec 3<&-
-    exec 3>&-
-    wait "$ffmpeg_pid" 2>/dev/null || true
-    return $status
+    return 1
 }
 
 # Background audio launch if needed
