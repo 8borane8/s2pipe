@@ -156,61 +156,56 @@ rtsp_out_opts=(-f rtsp -rtsp_transport tcp)
 # ---------------------------------------------------------------------------
 run_ffmpeg_with_watchdog() {
     local stall_timeout=10
-    local progress_fifo
-    local ffmpeg_pid
-    local watchdog_pid
+    local last_frame=-1
+    local frame
+    local line
+    local now
 
-    progress_fifo=$(mktemp -u /tmp/ffmpeg-progress.XXXXXX)
-    mkfifo "$progress_fifo"
+    coproc FFMPEG {
+        ffmpeg -stats_period 1 -progress pipe:1 "$@" 2>&2
+    }
 
-    ffmpeg -progress "$progress_fifo" "$@" &
-    ffmpeg_pid=$!
+    local ffmpeg_pid=$FFMPEG_PID
+    local last_change=$(date +%s)
 
-    echo "FFmpeg PID=$ffmpeg_pid" >&2
+    echo "Watchdog: started ffmpeg PID=$ffmpeg_pid" >&2
 
-    (
-        local last_frame=-1
-        local last_change
-        local line
-        local frame
+    while kill -0 "$ffmpeg_pid" 2>/dev/null; do
 
-        last_change=$(date +%s)
+        while IFS= read -r -t 0.1 line <&"${FFMPEG[0]}"; do
+            case "$line" in
+                frame=*)
+                    frame="${line#frame=}"
 
-        exec 3<"$progress_fifo"
-
-        while kill -0 "$ffmpeg_pid" 2>/dev/null; do
-
-            if IFS= read -r -t 1 line <&3; then
-                case "$line" in
-                    frame=*)
-                        frame="${line#frame=}"
-
-                        if [[ "$frame" != "$last_frame" ]]; then
-                            last_frame="$frame"
-                            last_change=$(date +%s)
-                        fi
-                        ;;
-                esac
-            fi
-
-            if (( $(date +%s) - last_change >= stall_timeout )); then
-                echo "WATCHDOG: FFmpeg frozen, killing $ffmpeg_pid" >&2
-                kill -9 "$ffmpeg_pid" 2>/dev/null || true
-                break
-            fi
+                    if [[ "$frame" != "$last_frame" ]]; then
+                        last_frame="$frame"
+                        last_change=$(date +%s)
+                    fi
+                    ;;
+            esac
         done
 
-        exec 3<&-
-    ) &
-    watchdog_pid=$!
+        now=$(date +%s)
+
+        if (( now - last_change >= stall_timeout )); then
+            echo "WATCHDOG: FFmpeg freezed !" >&2
+            echo "WATCHDOG: PID=$ffmpeg_pid frame=$last_frame" >&2
+            echo "WATCHDOG: aucune nouvelle frame depuis $((now-last_change))s" >&2
+            echo "WATCHDOG: kill -9 $ffmpeg_pid" >&2
+
+            kill -9 "$ffmpeg_pid" 2>/dev/null || true
+            wait "$ffmpeg_pid" 2>/dev/null || true
+
+            echo "WATCHDOG: FFmpeg killed, restarting..." >&2
+            return 1
+        fi
+
+        sleep 0.2
+    done
 
     wait "$ffmpeg_pid" 2>/dev/null || true
 
-    kill "$watchdog_pid" 2>/dev/null || true
-    wait "$watchdog_pid" 2>/dev/null || true
-
-    rm -f "$progress_fifo"
-
+    echo "Watchdog: FFmpeg exited." >&2
     return 1
 }
 
@@ -236,7 +231,7 @@ fi
 while :; do
     echo "Starting video publisher on ${CAPTURE_DEVICE:-test source}." >&2
     run_ffmpeg_with_watchdog \
-        -loglevel debug "${video[@]}" "${video_encoder[@]}" -an \
+        -hide_banner -nostats -loglevel debug "${video[@]}" "${video_encoder[@]}" -an \
         "${rtsp_out_opts[@]}" rtsp://127.0.0.1:8554/switch || true
 
     echo "Video publisher stopped; retrying in 1 second." >&2
