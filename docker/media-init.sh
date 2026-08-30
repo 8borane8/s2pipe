@@ -156,56 +156,65 @@ rtsp_out_opts=(-f rtsp -rtsp_transport tcp)
 # ---------------------------------------------------------------------------
 run_ffmpeg_with_watchdog() {
     local stall_timeout=10
-    local last_frame=-1
-    local frame
-    local line
-    local now
+    local progress_fifo
+    local ffmpeg_pid
+    local watchdog_pid
 
-    coproc FFMPEG {
-        ffmpeg -stats_period 1 -progress pipe:1 "$@" 2>&2
-    }
+    progress_fifo=$(mktemp -u /tmp/ffmpeg-progress.XXXXXX)
+    mkfifo "$progress_fifo"
 
-    local ffmpeg_pid=$FFMPEG_PID
-    local last_change=$(date +%s)
+    ffmpeg -progress "$progress_fifo" "$@" &
+    ffmpeg_pid=$!
 
-    echo "Watchdog: started ffmpeg PID=$ffmpeg_pid" >&2
+    echo "FFmpeg PID=$ffmpeg_pid" >&2
 
-    while kill -0 "$ffmpeg_pid" 2>/dev/null; do
+    (
+        local last_change=$(date +%s)
+        local last_frame=-1
+        local frame
+        local line
+        local now
 
-        while IFS= read -r -t 0.1 line <&"${FFMPEG[0]}"; do
-            case "$line" in
-                frame=*)
-                    frame="${line#frame=}"
+        exec 3<"$progress_fifo"
 
-                    if [[ "$frame" != "$last_frame" ]]; then
-                        last_frame="$frame"
-                        last_change=$(date +%s)
-                    fi
-                    ;;
-            esac
+        while kill -0 "$ffmpeg_pid" 2>/dev/null; do
+
+            if IFS= read -r -t 1 line <&3; then
+                case "$line" in
+                    frame=*)
+                        frame="${line#frame=}"
+
+                        if [[ "$frame" != "$last_frame" ]]; then
+                            last_frame="$frame"
+                            last_change=$(date +%s)
+                        fi
+                        ;;
+                esac
+            fi
+
+            now=$(date +%s)
+
+            if (( now - last_change >= stall_timeout )); then
+                echo "WATCHDOG: FFmpeg freezed !" >&2
+                echo "WATCHDOG: PID=$ffmpeg_pid frame=$last_frame" >&2
+
+                kill -9 "$ffmpeg_pid" 2>/dev/null || true
+                break
+            fi
         done
 
-        now=$(date +%s)
+        exec 3<&-
+    ) &
 
-        if (( now - last_change >= stall_timeout )); then
-            echo "WATCHDOG: FFmpeg freezed !" >&2
-            echo "WATCHDOG: PID=$ffmpeg_pid frame=$last_frame" >&2
-            echo "WATCHDOG: aucune nouvelle frame depuis $((now-last_change))s" >&2
-            echo "WATCHDOG: kill -9 $ffmpeg_pid" >&2
-
-            kill -9 "$ffmpeg_pid" 2>/dev/null || true
-            wait "$ffmpeg_pid" 2>/dev/null || true
-
-            echo "WATCHDOG: FFmpeg killed, restarting..." >&2
-            return 1
-        fi
-
-        sleep 0.2
-    done
+    watchdog_pid=$!
 
     wait "$ffmpeg_pid" 2>/dev/null || true
 
-    echo "Watchdog: FFmpeg exited." >&2
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+
+    rm -f "$progress_fifo"
+
     return 1
 }
 

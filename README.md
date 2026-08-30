@@ -21,6 +21,10 @@ Browsers --WHEP + WebSocket--> node --UART--> Pico --USB--> Switch 2
 | **Client**   | `apps/client`             | Browser UI                               |
 | **Firmware** | `firmware`                | Pico: UART in, 4 USB pads out            |
 
+## Result
+
+![s2pipe result](assets/result.png)
+
 Anyone can **Watch**. Four **Play** seats. P1-P4 numbers are set on the Switch, not by s2pipe.
 
 ## 1. Tested hardware
