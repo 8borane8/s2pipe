@@ -4,7 +4,9 @@
 services:
     media:
         environment:
-            FFMPEG_ENCODER: h264_nvenc
+            FFMPEG_ENCODER: ${FFMPEG_ENCODER:-h264_nvenc}
+            VIDEO_BITRATE: ${VIDEO_BITRATE:-}
+            VIDEO_PROFILE: ${VIDEO_PROFILE:-}
             NVIDIA_VISIBLE_DEVICES: all
             NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
         gpus: all

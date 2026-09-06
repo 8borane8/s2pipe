@@ -76,7 +76,7 @@ video_encoder=(
     -bufsize 6M
 )
 
-if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
+if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ] || [ "${FFMPEG_ENCODER:-}" = "hevc_nvenc" ]; then
     if [ ! -e /usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1 ] \
         && [ ! -e /usr/lib64/libnvidia-encode.so.1 ] \
         && [ ! -e /usr/lib/aarch64-linux-gnu/libnvidia-encode.so.1 ]; then
@@ -84,7 +84,7 @@ if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
             /host-usr-lib/x86_64-linux-gnu /host-usr-lib64 /host-usr-lib/aarch64-linux-gnu \
             -name 'libnvidia-encode.so.*' -type f -print -quit 2>/dev/null || true)
         if [ -z "$real" ]; then
-            echo "h264_nvenc requested but libnvidia-encode.so.1 is not in the container." >&2
+            echo "${FFMPEG_ENCODER} requested but libnvidia-encode.so.1 is not in the container." >&2
             exit 1
         fi
         mkdir -p /tmp/s2pipe-nvenc
@@ -92,15 +92,24 @@ if [ "${FFMPEG_ENCODER:-}" = "h264_nvenc" ]; then
         export LD_LIBRARY_PATH="/tmp/s2pipe-nvenc${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     fi
 
+    if [ "$FFMPEG_ENCODER" = "hevc_nvenc" ]; then
+        profile="${VIDEO_PROFILE:-main}"
+        default_bitrate="5M"
+    else
+        profile="${VIDEO_PROFILE:-high}"
+        default_bitrate="8M"
+    fi
+    bitrate="${VIDEO_BITRATE:-$default_bitrate}"
+
     video_encoder=(
-        -c:v h264_nvenc
+        -c:v "$FFMPEG_ENCODER"
         -preset p1
         -tune ull
-        -profile:v high
+        -profile:v "$profile"
         -rc cbr
-        -b:v 8M
-        -maxrate 8M
-        -bufsize 8M
+        -b:v "$bitrate"
+        -maxrate "$bitrate"
+        -bufsize "$bitrate"
         -g "$fps"
         -keyint_min "$fps"
         -force_key_frames "expr:gte(t,n_forced*1)"
