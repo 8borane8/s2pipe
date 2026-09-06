@@ -159,6 +159,8 @@ the pad, stand closer, retry. Hover the Pico pill if wake is not configured.
 | `MEDIA_ICE_IP` / `MEDIA_ICE_PORT`  | `127.0.0.1` / `8189`    | ICE (UDP)                             |
 | `CAPTURE_SOURCE`                   | `test`                  | `test` or `v4l2`                      |
 | `CAPTURE_DEVICE` / `CAPTURE_AUDIO` | `/dev/video0` / empty   | V4L2; ALSA HDMI (`hw:0,0`) or silence |
+| `AUDIO_BUFFER_TIME` / `PERIOD_TIME`| `20000` / `5000`        | ALSA buffer and period in µs (low latency)|
+| `AUDIO_FRAME_DURATION`             | `10`                    | Opus frame duration in ms (low latency)  |
 | `CAPTURE_FORMAT`                   | `yuyv422`               | `yuyv422`, or `mjpeg` if USB chokes   |
 | `CAPTURE_WIDTH` / `HEIGHT` / `FPS` | `1920` / `1080` / `60`  | Encode size                           |
 | `PICO_SERIAL`                      | empty                   | `/dev/ttyUSB0`                        |
