@@ -53,7 +53,7 @@ until (echo >/dev/tcp/127.0.0.1/8554) >/dev/null 2>&1; do
 done
 
 # Audio encoder configuration
-audio_encoder=(-c:a libopus -application lowdelay -b:a 64k -ar 48000 -ac 2)
+audio_encoder=(-c:a libopus -application lowdelay -frame_duration "${AUDIO_FRAME_DURATION:-10}" -b:a 64k -ar 48000 -ac 2)
 
 # Video encoder configuration
 size="${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}"
@@ -136,7 +136,7 @@ v4l2)
     video=(-thread_queue_size 2048 -fflags +genpts+igndts+discardcorrupt -f v4l2 -input_format "$fmt" \
         -framerate "$fps" -video_size "$size" -i "$dev")
     if [ -n "${CAPTURE_AUDIO:-}" ]; then
-        audio=(-use_wallclock_as_timestamps 1 -thread_queue_size 512 -f s16le -ac 2 -ar 48000 -i pipe:0)
+        audio=(-use_wallclock_as_timestamps 1 -fflags nobuffer -flags low_delay -thread_queue_size 512 -f s16le -ac 2 -ar 48000 -i pipe:0)
     fi
     ;;
 test)
@@ -232,7 +232,7 @@ if ((${#audio[@]})); then
     while :; do
         echo "Starting audio publisher on ${CAPTURE_AUDIO:-test source}." >&2
         if [ "$CAPTURE_SOURCE" = "v4l2" ]; then
-            arecord -D "$CAPTURE_AUDIO" -f S16_LE -c 2 -r 48000 -t raw |
+            arecord -D "$CAPTURE_AUDIO" -f S16_LE -c 2 -r 48000 -B "${AUDIO_BUFFER_TIME:-20000}" -F "${AUDIO_PERIOD_TIME:-5000}" -t raw |
                 ffmpeg -hide_banner -nostats -loglevel error "${audio[@]}" "${audio_encoder[@]}" \
                     "${rtsp_out_opts[@]}" rtsp://127.0.0.1:8554/switch-audio || true
         else
