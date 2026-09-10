@@ -70,9 +70,23 @@ fn overlay<T>(slot: &mut T, value: Option<T>) {
     }
 }
 
+fn follow_url_port(url: &str, old_port: &str, new_port: &str) -> String {
+    let trimmed = url.trim().trim_end_matches('/');
+    match trimmed.strip_suffix(&format!(":{old_port}")) {
+        Some(prefix) if !prefix.is_empty() => format!("{prefix}:{new_port}"),
+        _ => url.to_string(),
+    }
+}
+
 impl StartArgs {
     fn merge(self, mut config: AppConfig) -> AppConfig {
-        overlay(&mut config.node_port, self.node_port);
+        if let Some(port) = self.node_port {
+            if self.node_base_url.is_none() {
+                config.node_base_url =
+                    follow_url_port(&config.node_base_url, &config.node_port, &port);
+            }
+            config.node_port = port;
+        }
         overlay(&mut config.node_base_url, self.node_base_url);
         overlay(&mut config.client_port, self.client_port);
         overlay(&mut config.media_ice_ip, self.media_ice_ip);

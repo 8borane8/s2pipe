@@ -113,11 +113,36 @@ function getErrorMessage(error: unknown): string {
 	return String(error);
 }
 
+function nodeAddress(ip: string, port: string): string {
+	const host = ip === "127.0.0.1" ? "localhost" : ip;
+	const trimmed = port.trim();
+	return trimmed ? `http://${host}:${trimmed}` : `http://${host}`;
+}
+
+function isGeneratedNodeAddress(url: string, ip: string, port: string): boolean {
+	const normalized = url.trim().replace(/\/+$/, "");
+	if (normalized === nodeAddress(ip, port)) {
+		return true;
+	}
+
+	if (ip !== "127.0.0.1") {
+		return false;
+	}
+
+	const trimmed = port.trim();
+	return normalized === (trimmed ? `http://127.0.0.1:${trimmed}` : "http://127.0.0.1");
+}
+
 function mergeConfig(config: Partial<AppConfig> | null | undefined): AppConfig {
 	return {
 		...DEFAULT_CONFIG,
 		...(config ?? {}),
 	};
+}
+
+function isValidPort(value: string): boolean {
+	const port = Number(value.trim());
+	return Number.isInteger(port) && port > 0 && port <= 65535;
 }
 
 function maskMac(mac: string): string {
@@ -185,11 +210,25 @@ function App() {
 		setConfig((current) => ({
 			...current,
 			exposure,
-			nodeBaseUrl: ip === "127.0.0.1"
-				? `http://localhost:${current.nodePort}`
-				: `http://${ip}:${current.nodePort}`,
+			nodeBaseUrl: nodeAddress(ip, current.nodePort),
 			mediaIceIp: ip,
 		}));
+	}
+
+	function updateNodePort(port: string) {
+		setConfig((current) => {
+			const generated = isGeneratedNodeAddress(
+				current.nodeBaseUrl,
+				current.mediaIceIp,
+				current.nodePort,
+			);
+
+			return {
+				...current,
+				nodePort: port,
+				nodeBaseUrl: generated ? nodeAddress(current.mediaIceIp, port) : current.nodeBaseUrl,
+			};
+		});
 	}
 
 	async function applyExposure(value: string) {
@@ -414,18 +453,18 @@ function App() {
 	/* ---------------------------------------------------------------------- */
 
 	function validateConfig(): boolean {
-		if (!config.nodePort.trim()) {
-			showError("Node port is required.");
+		if (!isValidPort(config.nodePort)) {
+			showError("Node port is invalid.");
 			return false;
 		}
 
-		if (!config.clientPort.trim()) {
-			showError("Client port is required.");
+		if (!isValidPort(config.clientPort)) {
+			showError("Client port is invalid.");
 			return false;
 		}
 
-		if (!config.mediaIcePort.trim()) {
-			showError("ICE port is required.");
+		if (!isValidPort(config.mediaIcePort)) {
+			showError("ICE port is invalid.");
 			return false;
 		}
 
@@ -672,8 +711,7 @@ function App() {
 											type="text"
 											value={config.nodePort}
 											onInput={(event) =>
-												updateConfig(
-													"nodePort",
+												updateNodePort(
 													(
 														event.currentTarget as HTMLInputElement
 													).value,

@@ -1,10 +1,9 @@
 use std::process::Command;
-use std::time::{Duration, Instant};
 
 use crate::config::AppConfig;
 use crate::utils::bin::{bin_path, ensure_downloaded};
 use crate::utils::paths::app_directory;
-use crate::utils::process::{pid_alive, spawn_detached};
+use crate::utils::process::spawn_detached;
 
 const MEDIAMTX_VERSION: &str = "1.20.1";
 
@@ -85,25 +84,6 @@ pub fn start() -> Result<u32, String> {
     command.arg(&config);
     command.current_dir(app_directory()?);
     spawn_detached(command, "MediaMTX")
-}
-
-pub async fn wait_ready(pid: u32) -> Result<(), String> {
-    let deadline = Instant::now() + Duration::from_secs(60);
-    loop {
-        if !pid_alive(pid) {
-            return Err("MediaMTX exited before opening RTSP :8554".into());
-        }
-        if tokio::net::TcpStream::connect(("127.0.0.1", 8554))
-            .await
-            .is_ok()
-        {
-            return Ok(());
-        }
-        if Instant::now() >= deadline {
-            return Err("MediaMTX did not open RTSP :8554".into());
-        }
-        tokio::time::sleep(Duration::from_millis(200)).await;
-    }
 }
 
 fn config_path() -> Result<std::path::PathBuf, String> {

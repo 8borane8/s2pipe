@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Duration, Instant};
 
 use crate::config::AppConfig;
 use crate::utils::bin::ensure_downloaded;
@@ -72,29 +71,6 @@ pub fn start_client(deno: &Path, workspace: &Path, config: &AppConfig) -> Result
             ("NODE_BASE_URL", config.node_base_url.as_str()),
         ],
     )
-}
-
-pub async fn wait_for_node(port: &str) -> Result<(), String> {
-    wait_for_http(&format!("http://127.0.0.1:{port}/health"), "Node").await
-}
-
-pub async fn wait_for_client(port: &str) -> Result<(), String> {
-    wait_for_http(&format!("http://127.0.0.1:{port}/"), "Client").await
-}
-
-async fn wait_for_http(url: &str, name: &str) -> Result<(), String> {
-    let deadline = Instant::now() + Duration::from_secs(60);
-
-    while Instant::now() < deadline {
-        if let Ok(response) = reqwest::get(url).await {
-            if response.status().is_success() {
-                return Ok(());
-            }
-        }
-        tokio::time::sleep(Duration::from_millis(250)).await;
-    }
-
-    Err(format!("{name} did not become ready at {url}"))
 }
 
 fn spawn_app<'a>(

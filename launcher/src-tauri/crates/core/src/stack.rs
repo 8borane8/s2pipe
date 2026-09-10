@@ -62,6 +62,10 @@ impl Stack {
     }
 
     pub async fn start(config: AppConfig) -> Result<(), String> {
+        let node_port = parse_port(&config.node_port, "node")?;
+        let client_port = parse_port(&config.client_port, "client")?;
+        parse_port(&config.media_ice_port, "ICE")?;
+
         ensure_app_directory()?;
         let _ = Self::stop();
 
@@ -75,7 +79,7 @@ impl Stack {
         let started = async {
             let mediamtx_pid = mediamtx::start()?;
             pids.mediamtx = Some(mediamtx_pid);
-            mediamtx::wait_ready(mediamtx_pid).await?;
+            wait_for_port(8554, "MediaMTX", mediamtx_pid).await?;
 
             pids.ffmpeg = Some(ffmpeg::start_video(&config).await?);
 
@@ -83,12 +87,14 @@ impl Stack {
                 pids.ffmpeg_audio = Some(ffmpeg::start_audio(&config).await?);
             }
 
-            pids.node = Some(deno::start_node(&deno_bin, &workspace, &config)?);
-            pids.client = Some(deno::start_client(&deno_bin, &workspace, &config)?);
+            let node_pid = deno::start_node(&deno_bin, &workspace, &config)?;
+            pids.node = Some(node_pid);
+            let client_pid = deno::start_client(&deno_bin, &workspace, &config)?;
+            pids.client = Some(client_pid);
 
             save_pids(&pids)?;
-            deno::wait_for_node(&config.node_port).await?;
-            deno::wait_for_client(&config.client_port).await?;
+            wait_for_port(node_port, "Node", node_pid).await?;
+            wait_for_port(client_port, "Client", client_pid).await?;
             Ok::<(), String>(())
         }
         .await;
@@ -117,4 +123,34 @@ fn save_pids(pids: &StackPids) -> Result<(), String> {
     let json = serde_json::to_string_pretty(pids)
         .map_err(|e| format!("Failed to serialize stack pids: {e}"))?;
     std::fs::write(pids_path()?, json).map_err(|e| format!("Failed to write stack pids: {e}"))
+}
+
+fn parse_port(value: &str, name: &str) -> Result<u16, String> {
+    let port: u16 = value
+        .trim()
+        .parse()
+        .map_err(|_| format!("Invalid {name} port"))?;
+    if port == 0 {
+        return Err(format!("Invalid {name} port"));
+    }
+    Ok(port)
+}
+
+async fn wait_for_port(port: u16, name: &str, pid: u32) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    loop {
+        if !pid_alive(pid) {
+            return Err(format!("{name} exited before opening :{port}"));
+        }
+        if tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .is_ok()
+        {
+            return Ok(());
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(format!("{name} did not open :{port}"));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
 }
