@@ -1,14 +1,30 @@
-# s2pipe
+<h1 align="center">
+	<font color="#3ee6a0">s2</font>pipe
+</h1>
 
-Self-hosted Switch 2 cloud play. The console stays on the capture PC. Up to four browsers see the picture over WebRTC
-and play with a gamepad or keyboard. Inputs go to a Raspberry Pico that shows up on the Switch as 4 USB pads.
+<p align="center">
+	<strong>Self-hosted Switch 2 cloud play</strong><br>
+	Stream the dock over WebRTC and play from any browser on the LAN, up to four pads through a Pico.
+</p>
 
-No cloud, no subscription, no client to install. **No auth.** Trusted LAN only. Do not expose this on the Internet.
+<p align="center">
+	<a href="https://github.com/8borane8/s2pipe/releases"><img src="https://img.shields.io/github/v/release/8borane8/s2pipe?color=3ee6a0&labelColor=07080a" alt="Release"></a>
+	<a href="LICENCE"><img src="https://img.shields.io/badge/license-MIT-3ee6a0?labelColor=07080a" alt="MIT"></a>
+	<img src="https://img.shields.io/badge/Windows%20%7C%20Linux-3ee6a0?labelColor=07080a&label=platform" alt="Windows and Linux">
+	<br>
+	<a href="https://github.com/8borane8/s2pipe/stargazers"><img src="https://img.shields.io/github/stars/8borane8/s2pipe?color=3ee6a0&labelColor=07080a" alt="Stars"></a>
+	<a href="https://github.com/8borane8/s2pipe/forks"><img src="https://img.shields.io/github/forks/8borane8/s2pipe?color=3ee6a0&labelColor=07080a" alt="Forks"></a>
+</p>
 
-The **s2pipe launcher** (Windows and Linux) is the supported way to run it. It downloads FFmpeg and MediaMTX, starts
-Node and the browser UI, and talks to the Pico.
+<p align="center">
+	<img src="assets/result.png" alt="s2pipe in the browser" width="920">
+</p>
 
-![s2pipe](assets/banner.png)
+The console stays on the capture PC. Up to four browsers see the picture over WebRTC and play with a gamepad or
+keyboard. Inputs go to a Raspberry Pico that shows up on the Switch as 4 USB pads.
+
+The **s2pipe launcher** (Windows and Linux) downloads FFmpeg and MediaMTX, starts Node and the browser UI, and talks to
+the Pico. **No auth.** Trusted LAN only. Do not expose this on the Internet.
 
 ```
 Switch 2 --HDMI--> capture --USB--> launcher (FFmpeg + MediaMTX + node + client)
