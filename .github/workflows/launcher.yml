@@ -24,7 +24,7 @@ jobs:
         runs-on: ${{ matrix.platform }}
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
 
             - name: Setup Deno
               uses: denoland/setup-deno@v2
@@ -56,9 +56,12 @@ jobs:
             - name: Build GUI
               id: gui
               uses: tauri-apps/tauri-action@v0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   projectPath: launcher
                   tauriScript: deno task tauri
+                  includeUpdaterJson: false
 
             - name: Collect artifacts
               shell: bash
@@ -80,14 +83,14 @@ jobs:
                   done
 
             - name: Upload artifacts
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: s2pipe-${{ matrix.platform }}
                   path: release/*
 
             - name: Release
               if: startsWith(github.ref, 'refs/tags/v')
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   name: s2pipe ${{ github.ref_name }}
                   files: release/*
