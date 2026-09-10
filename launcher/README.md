@@ -7,10 +7,13 @@ whole stack detached.
 
 Download from [Releases](https://github.com/8borane8/s2pipe/releases):
 
-| File                     | What it is                                                            |
-| ------------------------ | --------------------------------------------------------------------- |
-| `s2pipe-<version>.*`     | GUI installer (`.msi`/`.exe` on Windows, `.deb`/`.AppImage` on Linux) |
-| `s2pipe-cli-<version>.*` | Single CLI binary, no install                                         |
+| File                         | What it is                                      |
+| ---------------------------- | ----------------------------------------------- |
+| `s2pipe-<version>.exe`       | Portable GUI (Windows, no install)              |
+| `s2pipe-<version>.AppImage`  | Portable GUI (Linux, no install)                |
+| `s2pipe-<version>.msi`       | GUI installer (Windows)                         |
+| `s2pipe-<version>.deb`       | GUI installer (Debian / Ubuntu)                 |
+| `s2pipe-cli-<version>.*`     | CLI, single binary, no install                  |
 
 Nothing else is required. The Deno apps (`apps/`, `shared/`, `deno.json`) are baked into the binary at compile time with
 `include_dir`, so a bare `.exe` carries the full stack.

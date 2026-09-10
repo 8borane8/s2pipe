@@ -20,7 +20,11 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                platform: [windows-latest, ubuntu-22.04]
+                include:
+                    - platform: windows-latest
+                      args: --bundles msi
+                    - platform: ubuntu-22.04
+                      args: --bundles deb,appimage
         runs-on: ${{ matrix.platform }}
         steps:
             - name: Checkout
@@ -48,7 +52,8 @@ jobs:
                       libwebkit2gtk-4.1-dev \
                       libayatana-appindicator3-dev \
                       librsvg2-dev \
-                      patchelf
+                      patchelf \
+                      libfuse2
 
             - name: Build CLI
               run: cargo build -p s2pipe --release --manifest-path launcher/src-tauri/Cargo.toml
@@ -62,6 +67,7 @@ jobs:
                   projectPath: launcher
                   tauriScript: deno task tauri
                   includeUpdaterJson: false
+                  args: ${{ matrix.args }}
 
             - name: Collect artifacts
               shell: bash
@@ -77,8 +83,23 @@ jobs:
                       cp "$cli" "release/s2pipe-cli-$version"
                   fi
 
-                  # Bundle extensions are unique per target, so the version alone is enough.
-                  for path in $(jq -r '.[]' <<< '${{ steps.gui.outputs.artifactPaths }}'); do
+                  # Windows GUI is a single .exe (WebView2 is already on the OS). Linux needs the
+                  # AppImage: the raw binary links WebKitGTK and is not portable.
+                  gui=launcher/src-tauri/target/release/s2pipe-gui
+                  if [ -f "$gui.exe" ]; then
+                      cp "$gui.exe" "release/s2pipe-$version.exe"
+                  fi
+
+                  shopt -s nullglob
+                  for path in \
+                      launcher/src-tauri/target/release/bundle/msi/* \
+                      launcher/src-tauri/target/release/bundle/deb/* \
+                      launcher/src-tauri/target/release/bundle/appimage/*
+                  do
+                      [ -f "$path" ] || continue
+                      case "$path" in
+                          *.sig | *.json) continue ;;
+                      esac
                       cp "$path" "release/s2pipe-$version.${path##*.}"
                   done
 
