@@ -1,0 +1,29 @@
+{
+	"lock": false,
+	"nodeModulesDir": "auto",
+	"minimumDependencyAge": "0",
+
+	"tasks": {
+		"dev": "tauri dev",
+		"dev:vite": "vite",
+		"build": "tsc && vite build",
+		"preview": "vite preview",
+		"tauri": "tauri"
+	},
+
+	"imports": {
+		"@tauri-apps/api": "npm:@tauri-apps/api@^2.11.1",
+
+		"preact": "npm:preact@^10.29.8",
+
+		"@preact/preset-vite": "npm:@preact/preset-vite@^2.10.6",
+		"@tauri-apps/cli": "npm:@tauri-apps/cli@^2.11.4",
+		"vite": "npm:vite@^8.2.2"
+	},
+
+	"fmt": {
+		"indentWidth": 4,
+		"lineWidth": 120,
+		"useTabs": true
+	}
+}

@@ -1,0 +1,40 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap");
+
+:root {
+	color-scheme: dark;
+
+	--font-sans: "Outfit", "Segoe UI", sans-serif;
+
+	--bg: #07080a;
+	--elevated: #15181e;
+	--line: #2a303a;
+	--text: #eef1f4;
+	--muted: #8b929c;
+	--accent: #3ee6a0;
+	--danger: #ff5c6e;
+
+	--text-lg: 1.5rem;
+	--space-1: 0.25rem;
+
+	--radius: 2px;
+}
+
+html,
+body {
+	width: 100%;
+	height: 100%;
+
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: 16px;
+	font-weight: 400;
+	line-height: 1.4;
+
+	overflow: hidden;
+	background: var(--bg);
+}
+
+#root {
+	width: 100%;
+	height: 100%;
+}

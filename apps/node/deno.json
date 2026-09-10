@@ -1,6 +1,6 @@
 {
 	"name": "@s2pipe/node",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"exports": "./src/mod.ts",
 
 	"tasks": {
@@ -10,11 +10,5 @@
 
 	"imports": {
 		"@/": "./src/"
-	},
-
-	"lint": {
-		"rules": {
-			"exclude": ["no-slow-types"]
-		}
 	}
 }

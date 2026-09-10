@@ -39,14 +39,22 @@ jobs:
                   cmake -S firmware -B firmware/build -DPICO_BOARD=pico2_w
                   cmake --build firmware/build
 
+            - name: Name UF2
+              run: |
+                  # Pull request refs look like "5/merge", which is not a valid file name.
+                  version="${GITHUB_REF_NAME//\//-}"
+                  mkdir -p release
+                  cp firmware/build/s2pipe_pico.uf2 "release/s2pipe-pico-$version.uf2"
+
             - name: Upload UF2
               uses: actions/upload-artifact@v4
               with:
-                  name: s2pipe_pico
-                  path: firmware/build/s2pipe_pico.uf2
+                  name: s2pipe-pico
+                  path: release/*.uf2
 
             - name: Release
               if: startsWith(github.ref, 'refs/tags/v')
               uses: softprops/action-gh-release@v2
               with:
-                  files: firmware/build/s2pipe_pico.uf2
+                  name: s2pipe ${{ github.ref_name }}
+                  files: release/*.uf2

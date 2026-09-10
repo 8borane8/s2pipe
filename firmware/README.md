@@ -30,6 +30,6 @@ No VCC. UART1, **921600 8N1**. Adapter RX/TX LEDs show traffic.
 
 One native USB: flash from the PC, then plug the Pico into the dock. Not a COM port and pads at the same time.
 
-Sleep wake (Pico 2 W / Pico W): [README §6](../README.md#6-sleep-wake). `python3 scripts/wake-scan.py` fills `.env`.
-On-board LED lights while the wake advert is on air. Non-W boards compile; wake is a no-op. Full power-off still needs
-the console button. Switch 1 pads cannot wake a Switch 2.
+Sleep wake (Pico 2 W / Pico W): use **Listen for controller** in the s2pipe launcher. The on-board LED stays on while
+the firmware is running and blinks only while the wake advert is on air. Non-W boards compile; wake is a no-op. Full
+power-off still needs the console button. Switch 1 pads cannot wake a Switch 2.

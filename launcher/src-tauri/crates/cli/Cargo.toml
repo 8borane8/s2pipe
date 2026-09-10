@@ -1,0 +1,13 @@
+[package]
+name = "s2pipe"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "s2pipe"
+path = "src/main.rs"
+
+[dependencies]
+s2pipe-core = { path = "../core" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }

@@ -178,8 +178,13 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		// deno-lint-ignore no-explicit-any
 		const video = videoRef.current as any;
 		if (!video) return;
-		const onEnd = () => { fullscreen.value = false; };
-		const onBegin = () => { fullscreen.value = true; settings.value = false; };
+		const onEnd = () => {
+			fullscreen.value = false;
+		};
+		const onBegin = () => {
+			fullscreen.value = true;
+			settings.value = false;
+		};
 		video.addEventListener("webkitendfullscreen", onEnd);
 		video.addEventListener("webkitbeginfullscreen", onBegin);
 		return () => {

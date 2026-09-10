@@ -1,0 +1,185 @@
+@charset "utf-8";
+
+/**
+ * Nuclear Reset CSS
+ * Version 1.0.0
+ *
+ * A highly aggressive CSS reset designed to neutralize
+ * browser User-Agent styles while preserving essential
+ * native element behavior.
+ *
+ * Philosophy:
+ * - Remove browser default styling
+ * - Preserve meaningful native display behavior
+ * - Normalize the box model
+ * - Remove default spacing
+ * - Remove default list markers
+ * - Neutralize form control styling
+ * - Normalize media elements
+ * - Preserve functional browser behaviors
+ *
+ * Usage:
+ * Import this file before your application styles.
+ */
+
+/* =========================================================
+   NUCLEAR RESET
+   ========================================================= */
+
+*:where(:not(html, iframe, canvas, img, svg, video, audio, .katex, .katex-display):not(svg *, symbol *, .katex *, .katex-display *)) {
+	all: unset;
+	display: revert;
+}
+
+/* =========================================================
+   BOX MODEL
+   ========================================================= */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+/* =========================================================
+   DOCUMENT
+   ========================================================= */
+
+html,
+body {
+	width: 100%;
+	min-height: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+body {
+	min-height: 100vh;
+}
+
+/* =========================================================
+   INTERACTION
+   ========================================================= */
+
+a,
+button,
+label,
+select,
+summary {
+	cursor: pointer;
+}
+
+/* =========================================================
+   LISTS
+   ========================================================= */
+
+ol,
+ul,
+menu {
+	list-style: none;
+}
+
+/* =========================================================
+   MEDIA
+   ========================================================= */
+
+img,
+picture,
+video,
+canvas,
+svg {
+	display: block;
+	max-width: 100%;
+}
+
+img,
+video {
+	height: auto;
+}
+
+/* =========================================================
+   TABLES
+   ========================================================= */
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+/* =========================================================
+   FORMS
+   ========================================================= */
+
+input,
+textarea {
+	-webkit-user-select: auto;
+	user-select: auto;
+	cursor: text;
+}
+
+textarea {
+	white-space: revert;
+	resize: vertical;
+}
+
+::placeholder {
+	color: unset;
+	opacity: 1;
+}
+
+/* =========================================================
+   MARKERS
+   ========================================================= */
+
+::marker {
+	content: initial;
+}
+
+/* =========================================================
+   PREFORMATTED CONTENT
+   ========================================================= */
+
+:where(pre) {
+	all: revert;
+}
+
+/* =========================================================
+   HIDDEN
+   ========================================================= */
+
+:where([hidden]) {
+	display: none !important;
+}
+
+/* =========================================================
+   CONTENTEDITABLE
+   ========================================================= */
+
+:where([contenteditable]:not([contenteditable="false"])) {
+	-moz-user-modify: read-write;
+	-webkit-user-modify: read-write;
+	overflow-wrap: break-word;
+	line-break: after-white-space;
+	user-select: auto;
+}
+
+/* =========================================================
+   DRAG & DROP
+   ========================================================= */
+
+:where([draggable="true"]) {
+	-webkit-user-drag: element;
+}
+
+/* =========================================================
+   DIALOG
+   ========================================================= */
+
+:where(dialog:modal) {
+	all: revert;
+}

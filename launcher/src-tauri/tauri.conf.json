@@ -1,0 +1,37 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "s2pipe",
+	"version": "0.1.1",
+	"identifier": "8borane8.s2pipe.launcher",
+	"build": {
+		"beforeDevCommand": "deno task dev:vite",
+		"devUrl": "http://localhost:1420",
+		"beforeBuildCommand": "deno task build",
+		"frontendDist": "../dist"
+	},
+	"app": {
+		"windows": [
+			{
+				"title": "s2pipe",
+				"width": 800,
+				"height": 600,
+				"center": true,
+				"visible": false,
+				"resizable": false,
+				"maximizable": false,
+				"backgroundColor": "#07080a"
+			}
+		],
+		"security": {
+			"csp": null
+		}
+	},
+	"bundle": {
+		"active": true,
+		"targets": "all",
+		"icon": [
+			"icons/icon-96x96.png",
+			"icons/icon.ico"
+		]
+	}
+}

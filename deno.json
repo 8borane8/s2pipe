@@ -22,5 +22,11 @@
 		"indentWidth": 4,
 		"lineWidth": 120,
 		"useTabs": true
+	},
+
+	"lint": {
+		"rules": {
+			"exclude": ["no-slow-types"]
+		}
 	}
 }

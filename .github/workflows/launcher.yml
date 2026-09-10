@@ -1,0 +1,83 @@
+name: launcher
+
+on:
+    push:
+        tags: ["v*"]
+    pull_request:
+        paths:
+            - "launcher/**"
+            - "apps/**"
+            - "shared/**"
+            - "deno.json"
+            - ".github/workflows/launcher.yml"
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    publish:
+        strategy:
+            fail-fast: false
+            matrix:
+                platform: [windows-latest, ubuntu-22.04]
+        runs-on: ${{ matrix.platform }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Deno
+              uses: denoland/setup-deno@v2
+              with:
+                  deno-version: v2.9.6
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Linux dependencies
+              if: matrix.platform == 'ubuntu-22.04'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+
+            - name: Build CLI
+              run: cargo build -p s2pipe --release --manifest-path launcher/src-tauri/Cargo.toml
+
+            - name: Build GUI
+              id: gui
+              uses: tauri-apps/tauri-action@v0
+              with:
+                  projectPath: launcher
+                  tauriScript: deno task tauri
+
+            - name: Collect artifacts
+              shell: bash
+              run: |
+                  # Pull request refs look like "5/merge", which is not a valid file name.
+                  version="${GITHUB_REF_NAME//\//-}"
+                  mkdir -p release
+
+                  cli=launcher/src-tauri/target/release/s2pipe
+                  if [ -f "$cli.exe" ]; then
+                      cp "$cli.exe" "release/s2pipe-cli-$version.exe"
+                  else
+                      cp "$cli" "release/s2pipe-cli-$version"
+                  fi
+
+                  # Bundle extensions are unique per target, so the version alone is enough.
+                  for path in $(jq -r '.[]' <<< '${{ steps.gui.outputs.artifactPaths }}'); do
+                      cp "$path" "release/s2pipe-$version.${path##*.}"
+                  done
+
+            - name: Upload artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: s2pipe-${{ matrix.platform }}
+                  path: release/*
+
+            - name: Release
+              if: startsWith(github.ref, 'refs/tags/v')
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: s2pipe ${{ github.ref_name }}
+                  files: release/*

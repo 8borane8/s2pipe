@@ -1,0 +1,730 @@
+/* =========================================================
+   Layout
+   ========================================================= */
+
+main {
+	width: 100%;
+	height: 100%;
+	padding: 32px;
+
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 24px;
+
+	overflow: hidden;
+}
+
+header {
+	width: 100%;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+form {
+	width: 100%;
+	min-height: 0;
+	flex: 1;
+
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 32px;
+
+	overflow: hidden;
+}
+
+.form-body {
+	width: 100%;
+	min-height: 0;
+	flex: 1;
+
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 32px;
+
+	overflow-x: hidden;
+	overflow-y: auto;
+
+	scrollbar-width: thin;
+	scrollbar-color: var(--line) transparent;
+}
+
+.form-body::-webkit-scrollbar {
+	width: 8px;
+}
+
+.form-body::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.form-body::-webkit-scrollbar-thumb {
+	background: var(--line);
+	border-radius: 99px;
+}
+
+.form-body::-webkit-scrollbar-thumb:hover {
+	background: var(--muted);
+}
+
+/* =========================================================
+   Fieldsets / Sections
+   ========================================================= */
+
+form .form-body > fieldset {
+	width: 100%;
+	margin: 0;
+	padding: 0;
+
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 20px;
+
+	border: 0;
+}
+
+form .form-body > fieldset > section {
+	width: 100%;
+	margin: 0;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 4px;
+}
+
+form .form-body > fieldset > section > h2 {
+	margin: 0;
+
+	color: var(--text);
+	font-size: 17px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+form .form-body > fieldset > section > p {
+	margin: 0;
+
+	color: var(--muted);
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+/* =========================================================
+   Fields
+   ========================================================= */
+
+form label {
+	width: 100%;
+
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
+	gap: 8px;
+}
+
+form label.toggle,
+form label.switch {
+	position: relative;
+
+	flex-direction: row;
+	align-items: center;
+}
+
+form label > span {
+	color: var(--text);
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+form label > small,
+form .form-body > fieldset > small {
+	display: block;
+
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.4;
+}
+
+/* =========================================================
+   Inputs / Selects
+   ========================================================= */
+
+form label > input:not([type="checkbox"]),
+form label > select,
+form .select-with-button > select {
+	width: 100%;
+	min-height: 38px;
+
+	color: var(--text);
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1.4;
+
+	padding: 8px 12px;
+
+	background: var(--elevated);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+
+	outline: none;
+
+	transition:
+		border-color 0.15s ease,
+		background 0.15s ease,
+		box-shadow 0.15s ease;
+}
+
+form label > input:not([type="checkbox"]):hover,
+form label > select:hover,
+form .select-with-button > select:hover {
+	border-color: color-mix(
+		in srgb,
+		var(--line) 60%,
+		var(--text)
+	);
+}
+
+form label > input:not([type="checkbox"]):focus,
+form label > select:focus,
+form .select-with-button > select:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 2px
+		color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+form label > input::placeholder {
+	color: var(--muted);
+	opacity: 0.7;
+}
+
+/* =========================================================
+   Two-column fields
+   ========================================================= */
+
+form .fields-grid {
+	width: 100%;
+
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+form .fields-grid > .field {
+	width: 100%;
+	min-width: 0;
+
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
+	gap: 8px;
+}
+
+/* =========================================================
+   Select + button
+   ========================================================= */
+
+form .select-with-button {
+	width: 100%;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 8px;
+}
+
+form .select-with-button > select {
+	flex: 1;
+	min-width: 0;
+}
+
+form .select-with-button > button,
+#scan-pad-button {
+	flex-shrink: 0;
+
+	min-height: 38px;
+
+	color: var(--text);
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 500;
+
+	padding: 8px 12px;
+
+	background: var(--elevated);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+
+	cursor: pointer;
+
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease;
+}
+
+#scan-pad-button {
+	width: 100%;
+
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+	gap: 16px;
+}
+
+form .select-with-button > button:hover,
+#scan-pad-button:hover {
+	border-color: var(--text);
+	background: var(--bg);
+}
+
+form .select-with-button > button:focus-visible,
+#scan-pad-button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+form .select-with-button > button:disabled,
+#scan-pad-button:disabled {
+	color: var(--muted);
+	border-color: var(--line);
+	cursor: default;
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.button-error {
+	color: var(--danger);
+	border-color: var(--danger);
+}
+
+/* =========================================================
+   Presets
+   ========================================================= */
+
+form .presets-block {
+	width: 100%;
+
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
+	gap: 8px;
+}
+
+form .presets-block > span {
+	color: var(--text);
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+form .presets {
+	width: 100%;
+
+	display: flex;
+	flex-direction: row-reverse;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 8px;
+}
+
+form .preset-btn {
+	flex: 1;
+	min-width: 0;
+	min-height: 38px;
+
+	color: var(--text);
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 500;
+
+	padding: 8px 12px;
+
+	background: var(--elevated);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+
+	cursor: pointer;
+
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease,
+		transform 0.1s ease;
+}
+
+form .preset-btn:hover {
+	border-color: var(--text);
+	background: var(--bg);
+}
+
+form .preset-btn:active {
+	transform: translateY(1px);
+}
+
+form .preset-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+form .preset-btn.active {
+	color: var(--bg);
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+form .preset-btn.active:hover {
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+/* =========================================================
+   Advanced settings
+   ========================================================= */
+
+.mode-row {
+	width: 100%;
+	flex-shrink: 0;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+fieldset.advanced > section > h2 {
+	color: var(--muted);
+}
+
+.fields-grid.advanced > .field label > span {
+	color: var(--muted);
+	font-weight: 400;
+}
+
+.fields-grid.advanced > .field label > input:not([type="checkbox"]),
+.fields-grid.advanced > .field label > select {
+	background: transparent;
+}
+
+.fields-grid.advanced > .field label > input:not([type="checkbox"]):focus,
+.fields-grid.advanced > .field label > select:focus {
+	background: var(--elevated);
+}
+
+/* =========================================================
+   Advanced switch
+   ========================================================= */
+
+.switch {
+	width: auto;
+	flex: 1;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 8px;
+
+	cursor: pointer;
+	user-select: none;
+}
+
+.switch-ui {
+	width: 32px;
+	height: 18px;
+
+	position: relative;
+	flex-shrink: 0;
+
+	background: var(--elevated);
+	border: 1px solid var(--line);
+	border-radius: 999px;
+
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease;
+}
+
+.switch-ui::after {
+	content: "";
+
+	width: 12px;
+	height: 12px;
+
+	position: absolute;
+	top: 2px;
+	left: 2px;
+
+	background: var(--muted);
+	border-radius: 999px;
+
+	transition:
+		transform 0.15s ease,
+		background 0.15s ease;
+}
+
+.switch > input[type="checkbox"]:checked + .switch-ui {
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+.switch > input[type="checkbox"]:checked + .switch-ui::after {
+	background: var(--bg);
+	transform: translateX(14px);
+}
+
+.switch > input[type="checkbox"]:focus-visible + .switch-ui {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.switch-label {
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+.switch > input[type="checkbox"]:checked ~ .switch-label {
+	color: var(--text);
+}
+
+/* =========================================================
+   Launcher toggles
+   ========================================================= */
+
+.toggles {
+	width: 100%;
+
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+
+.toggle {
+	width: 100%;
+	margin: 0;
+	padding: 14px 16px;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 14px;
+
+	background: var(--elevated);
+	overflow: hidden;
+
+	cursor: pointer;
+
+	transition: background 0.15s ease;
+}
+
+.toggle:hover {
+	background: var(--bg);
+}
+
+.toggle > input[type="checkbox"],
+.switch > input[type="checkbox"] {
+	appearance: none;
+
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	clip-path: inset(50%);
+
+	pointer-events: none;
+}
+
+.toggle-ui {
+	width: 36px;
+	height: 20px;
+
+	position: relative;
+	flex-shrink: 0;
+
+	background: var(--bg);
+	border: 1px solid var(--line);
+	border-radius: 999px;
+
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease;
+}
+
+.toggle-ui::after {
+	content: "";
+
+	width: 14px;
+	height: 14px;
+
+	position: absolute;
+	top: 2px;
+	left: 2px;
+
+	background: var(--muted);
+	border-radius: 999px;
+
+	transition:
+		transform 0.15s ease,
+		background 0.15s ease;
+}
+
+.toggle > input[type="checkbox"]:checked + .toggle-ui {
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+.toggle > input[type="checkbox"]:checked + .toggle-ui::after {
+	background: var(--bg);
+	transform: translateX(16px);
+}
+
+.toggle > input[type="checkbox"]:focus-visible + .toggle-ui {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.toggle > div {
+	min-width: 0;
+
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 3px;
+}
+
+.toggle strong {
+	color: var(--text);
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+.toggle small {
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.4;
+}
+
+/* =========================================================
+   Bottom actions
+   ========================================================= */
+
+.actions {
+	width: auto;
+	flex-shrink: 0;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 12px;
+
+	padding-top: 4px;
+}
+
+.actions button {
+	min-height: 42px;
+
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 600;
+
+	padding: 9px 16px;
+
+	border-radius: var(--radius);
+
+	cursor: pointer;
+
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease,
+		opacity 0.15s ease,
+		transform 0.1s ease;
+}
+
+.actions button:active:not(:disabled) {
+	transform: translateY(1px);
+}
+
+.actions button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.actions .stop {
+	color: var(--text);
+	background: transparent;
+	border: 1px solid var(--line);
+}
+
+.actions .stop:hover:not(:disabled) {
+	background: var(--elevated);
+	border-color: var(--text);
+}
+
+.actions .stop:disabled {
+	color: var(--muted);
+	background: transparent;
+	border-color: var(--line);
+	cursor: default;
+	opacity: 0.5;
+}
+
+.actions .start {
+	color: var(--bg);
+	background: var(--accent);
+	border: 1px solid var(--accent);
+}
+
+.actions .start:hover:not(:disabled) {
+	opacity: 0.9;
+}
+
+.actions .start:active:not(:disabled) {
+	opacity: 0.8;
+}
+
+.actions .start:disabled {
+	border-color: var(--line);
+	cursor: default;
+	opacity: 0.4;
+}
