@@ -54,6 +54,9 @@ Equivalents are fine.
 Download the Windows or Linux build from [Releases](https://github.com/8borane8/s2pipe/releases). Run it. First start
 fetches FFmpeg, MediaMTX, and Deno into `~/.s2pipe/bins/`.
 
+On **Windows**, install the CP2102 UART driver first or the Pico port never appears:
+[Silicon Labs VCP drivers](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers).
+
 ## 3. Flash the Pico
 
 1. Download `s2pipe-pico-<version>.uf2` from [Releases](https://github.com/8borane8/s2pipe/releases) (no SDK needed).

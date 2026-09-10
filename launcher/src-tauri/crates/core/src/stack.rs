@@ -50,6 +50,12 @@ impl Stack {
     pub fn stop() -> Result<(), String> {
         if let Some(pids) = load_pids() {
             pids.kill_all();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            while pids.is_running() && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            // COM handles can linger a tick after the process exit code flips.
+            std::thread::sleep(std::time::Duration::from_millis(150));
         }
         let _ = std::fs::remove_file(pids_path()?);
         Ok(())
@@ -82,6 +88,7 @@ impl Stack {
 
             save_pids(&pids)?;
             deno::wait_for_node(&config.node_port).await?;
+            deno::wait_for_client(&config.client_port).await?;
             Ok::<(), String>(())
         }
         .await;

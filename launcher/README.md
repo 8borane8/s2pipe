@@ -7,22 +7,20 @@ whole stack detached.
 
 Download from [Releases](https://github.com/8borane8/s2pipe/releases):
 
-| File                         | What it is                                      |
-| ---------------------------- | ----------------------------------------------- |
-| `s2pipe-<version>.exe`       | Portable GUI (Windows, no install)              |
-| `s2pipe-<version>.AppImage`  | Portable GUI (Linux, no install)                |
-| `s2pipe-<version>.msi`       | GUI installer (Windows)                         |
-| `s2pipe-<version>.deb`       | GUI installer (Debian / Ubuntu)                 |
-| `s2pipe-cli-<version>.*`     | CLI, single binary, no install                  |
+| File                        | What it is                         |
+| --------------------------- | ---------------------------------- |
+| `s2pipe-<version>.exe`      | Portable GUI (Windows, no install) |
+| `s2pipe-<version>.AppImage` | Portable GUI (Linux, no install)   |
+| `s2pipe-<version>.msi`      | GUI installer (Windows)            |
+| `s2pipe-<version>.deb`      | GUI installer (Debian / Ubuntu)    |
+| `s2pipe-cli-<version>.*`    | CLI, single binary, no install     |
 
 Nothing else is required. The Deno apps (`apps/`, `shared/`, `deno.json`) are baked into the binary at compile time with
 `include_dir`, so a bare `.exe` carries the full stack.
 
 ## Run
 
-Pick a capture card and a Pico port in the GUI, then press **Start s2pipe**. On Windows, install the UART adapter driver
-first (CP2102: [Silicon Labs](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)) or the Pico port never
-appears.
+Pick a capture card and a Pico port in the GUI, then press **Start s2pipe**.
 
 Or headless:
 
@@ -46,7 +44,7 @@ Flags overlay `~/.s2pipe/config.json`, they are not written back. The GUI writes
 3. Writes `~/.s2pipe/mediamtx.yml` from the config (ICE IP and port).
 4. Starts MediaMTX and waits for RTSP `:8554` to accept a connection.
 5. Starts FFmpeg video, then FFmpeg audio if a mic is selected.
-6. Starts the Deno node and client, then waits for `/health`.
+6. Starts the Deno node and client, then waits for node `/health` and the client UI.
 
 PIDs land in `~/.s2pipe/stack.json`. Every child is spawned detached in its own process group, so closing the launcher
 leaves the stack running and `s2pipe stop` kills it from any process. If any step fails, everything already started is

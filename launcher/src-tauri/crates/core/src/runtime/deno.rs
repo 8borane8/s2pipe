@@ -75,11 +75,18 @@ pub fn start_client(deno: &Path, workspace: &Path, config: &AppConfig) -> Result
 }
 
 pub async fn wait_for_node(port: &str) -> Result<(), String> {
-    let url = format!("http://127.0.0.1:{port}/health");
+    wait_for_http(&format!("http://127.0.0.1:{port}/health"), "Node").await
+}
+
+pub async fn wait_for_client(port: &str) -> Result<(), String> {
+    wait_for_http(&format!("http://127.0.0.1:{port}/"), "Client").await
+}
+
+async fn wait_for_http(url: &str, name: &str) -> Result<(), String> {
     let deadline = Instant::now() + Duration::from_secs(60);
 
     while Instant::now() < deadline {
-        if let Ok(response) = reqwest::get(&url).await {
+        if let Ok(response) = reqwest::get(url).await {
             if response.status().is_success() {
                 return Ok(());
             }
@@ -87,7 +94,7 @@ pub async fn wait_for_node(port: &str) -> Result<(), String> {
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
 
-    Err(format!("Node did not become ready at {url}"))
+    Err(format!("{name} did not become ready at {url}"))
 }
 
 fn spawn_app<'a>(

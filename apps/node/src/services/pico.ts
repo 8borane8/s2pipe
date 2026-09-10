@@ -152,8 +152,14 @@ function startFlush(): void {
 }
 
 function windowsComPort(path: string): string | null {
-	const match = path.match(/(?:\\\\\.\\)?(COM\d+)$/i);
-	return match ? match[1].toUpperCase() : null;
+	const match = path.trim().match(/COM\d+/i);
+	return match ? match[0].toUpperCase() : null;
+}
+
+function serialPath(path: string): string {
+	if (Deno.build.os !== "windows") return path;
+	const com = windowsComPort(path);
+	return com ? `\\\\.\\${com}` : path;
 }
 
 async function setSerialBaud(path: string): Promise<void> {
@@ -188,11 +194,17 @@ async function setSerialBaud(path: string): Promise<void> {
 	}
 
 	const result = await command.output();
-	if (result.success) return;
-	const detail = new TextDecoder().decode(result.stderr).trim() ||
-		new TextDecoder().decode(result.stdout).trim() ||
-		`exit ${result.code}`;
-	throw new Error(`serial baud ${SERIAL_BAUD} failed: ${detail}`);
+	if (!result.success) {
+		const detail = new TextDecoder().decode(result.stderr).trim() ||
+			new TextDecoder().decode(result.stdout).trim() ||
+			`exit ${result.code}`;
+		throw new Error(`serial baud ${SERIAL_BAUD} failed: ${detail}`);
+	}
+
+	// `mode` exclusive-opens the port; give Windows a beat to release it.
+	if (Deno.build.os === "windows") {
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
 }
 
 async function openPico(): Promise<void> {
@@ -200,8 +212,7 @@ async function openPico(): Promise<void> {
 
 	try {
 		await setSerialBaud(config.picoSerial);
-		file = await Deno.open(config.picoSerial, { write: true });
-		await setSerialBaud(config.picoSerial);
+		file = await Deno.open(serialPath(config.picoSerial), { read: true, write: true });
 		picoError = null;
 		dirty = true;
 		startFlush();
