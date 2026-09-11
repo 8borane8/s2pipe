@@ -44,11 +44,13 @@ Flags overlay `~/.s2pipe/config.json`, they are not written back. The GUI writes
 3. Writes `~/.s2pipe/mediamtx.yml` from the config (ICE IP and port).
 4. Starts MediaMTX and waits for RTSP `:8554` to accept a connection.
 5. Starts FFmpeg video, then FFmpeg audio if a mic is selected.
-6. Starts the Deno node and client, then waits for node `/health` and the client UI.
+6. Starts the Deno node and client, then waits for both ports to accept a connection.
 
 PIDs land in `~/.s2pipe/stack.json`. Every child is spawned detached in its own process group, so closing the launcher
 leaves the stack running and `s2pipe stop` kills it from any process. If any step fails, everything already started is
-killed and the error is surfaced.
+killed and the error is surfaced. Stdout and stderr of each process go to `~/.s2pipe/logs` (`node.log`, `client.log`,
+`mediamtx.log`, `ffmpeg-video.log`, `ffmpeg-audio.log`). When a process dies at start, the last log lines are included
+in the error.
 
 FFmpeg is the fragile part, so every launch is a list of attempts: the first process still alive after 1.5 s wins. Video
 walks the encoder backends, then retries them with size, framerate and pixel format dropped. Audio asks for a short
@@ -73,14 +75,14 @@ All backends are configured for low latency: no B-frames, one keyframe per secon
 
 Everything lives in `~/.s2pipe`:
 
-| Path           | Contents                                    |
-| -------------- | ------------------------------------------- |
-| `config.json`  | Saved GUI settings                          |
-| `stack.json`   | PIDs of the running processes               |
-| `mediamtx.yml` | Generated on every start, do not edit       |
-| `bins/`        | Downloaded FFmpeg, MediaMTX, Deno           |
-| `app/`         | Deno workspace extracted from the binary    |
-| `logs/`        | `ffmpeg-video.log`, `ffmpeg-audio.log`, ... |
+| Path           | Contents                                              |
+| -------------- | ----------------------------------------------------- |
+| `config.json`  | Saved GUI settings                                    |
+| `stack.json`   | PIDs of the running processes                         |
+| `mediamtx.yml` | Generated on every start, do not edit                 |
+| `bins/`        | Downloaded FFmpeg, MediaMTX, Deno                     |
+| `app/`         | Deno workspace extracted from the binary              |
+| `logs/`        | `node.log`, `client.log`, `mediamtx.log`, FFmpeg logs |
 
 ## Ports
 

@@ -3,8 +3,8 @@ use std::process::Command;
 
 use crate::config::AppConfig;
 use crate::utils::bin::ensure_downloaded;
-use crate::utils::paths::app_directory;
-use crate::utils::process::spawn_detached;
+use crate::utils::paths::{app_directory, log_path};
+use crate::utils::process::spawn_logged;
 
 const DENO_VERSION: &str = "2.9.6";
 
@@ -54,6 +54,7 @@ pub fn start_node(deno: &Path, workspace: &Path, config: &AppConfig) -> Result<u
             ("CONTROLLER_BT_MAC", config.controller_bt_mac.as_str()),
             ("CONTROLLER_BT_PID", config.controller_bt_pid.as_str()),
         ],
+        "node",
     )
 }
 
@@ -70,6 +71,7 @@ pub fn start_client(deno: &Path, workspace: &Path, config: &AppConfig) -> Result
             ("CLIENT_PORT", config.client_port.as_str()),
             ("NODE_BASE_URL", config.node_base_url.as_str()),
         ],
+        "client",
     )
 }
 
@@ -78,6 +80,7 @@ fn spawn_app<'a>(
     workspace: &Path,
     entry: PathBuf,
     env: impl IntoIterator<Item = (&'a str, &'a str)>,
+    name: &str,
 ) -> Result<u32, String> {
     if !entry.exists() {
         return Err(format!("App entry not found: {}", entry.display()));
@@ -97,5 +100,5 @@ fn spawn_app<'a>(
         command.env(key, value);
     }
 
-    spawn_detached(command, &entry.display().to_string())
+    spawn_logged(command, name, &log_path(name)?)
 }

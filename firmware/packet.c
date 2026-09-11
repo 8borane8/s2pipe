@@ -47,25 +47,30 @@ void packet_init(pad_state_t pads[PAD_COUNT]) {
 static bool parse_frame(uint8_t const *frame, pad_state_t pads[PAD_COUNT]) {
 	if (frame[2] != PACKET_VERSION) return false;
 
-	uint16_t got = (uint16_t)frame[36] | ((uint16_t)frame[37] << 8);
-	if (got != crc16_ccitt(frame, 36)) return false;
+	uint16_t got = (uint16_t)frame[PACKET_CRC_OFF] | ((uint16_t)frame[PACKET_CRC_OFF + 1] << 8);
+	if (got != crc16_ccitt(frame, PACKET_CRC_OFF)) return false;
 
-	if ((frame[3] & PACKET_FLAG_WAKE) && !mac_zero(frame + 38) && !mac_zero(frame + 44)) {
-		memcpy(wake_switch_mac, frame + 38, 6);
-		memcpy(wake_pad_mac, frame + 44, 6);
-		wake_pid = (uint16_t)frame[50] | ((uint16_t)frame[51] << 8);
+	if (
+		(frame[3] & PACKET_FLAG_WAKE) &&
+		!mac_zero(frame + PACKET_WAKE_SWITCH_OFF) &&
+		!mac_zero(frame + PACKET_WAKE_PAD_OFF)
+	) {
+		memcpy(wake_switch_mac, frame + PACKET_WAKE_SWITCH_OFF, 6);
+		memcpy(wake_pad_mac, frame + PACKET_WAKE_PAD_OFF, 6);
+		wake_pid = (uint16_t)frame[PACKET_WAKE_PID_OFF] |
+			((uint16_t)frame[PACKET_WAKE_PID_OFF + 1] << 8);
 		if (!wake_pid) wake_pid = PACKET_PID_DEFAULT;
 		wake_pending = true;
 	}
 
-	uint8_t const *p = frame + 4;
+	uint8_t const *p = frame + PACKET_PADS_OFF;
 	for (uint8_t i = 0; i < PAD_COUNT; i++) {
 		pads[i].buttons = (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 		pads[i].lx = p[4];
 		pads[i].ly = p[5];
 		pads[i].rx = p[6];
 		pads[i].ry = p[7];
-		p += 8;
+		p += PACKET_PAD_SIZE;
 	}
 	return true;
 }

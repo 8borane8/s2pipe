@@ -1,10 +1,5 @@
 import { clampAxis, neutralPad, PAD_CENTER, PadButton, type PadState } from "@s2pipe/shared/types/pad";
 
-export type InputSource = {
-	kind: "gamepad";
-	index: number;
-};
-
 export type GamepadOption = {
 	index: number;
 	id: string;
@@ -195,8 +190,12 @@ export function createInputTracker() {
 			clearKeys();
 		},
 
-		sample(source: InputSource): PadState {
-			const pad = sampleGamepad(source.index) ?? neutralPad();
+		sample(index: number | null, extraKeys = false): PadState {
+			const pad = index === null ? neutralPad() : sampleGamepad(index) ?? neutralPad();
+
+			if (!extraKeys) {
+				return pad;
+			}
 
 			let extraButtons = 0;
 
@@ -215,10 +214,3 @@ export function createInputTracker() {
 		},
 	};
 }
-
-export const KEYBOARD_HELP = [
-	["H / G", "Home / Capture"],
-	["Home / PS / Guide", "Home"],
-	["+ and -", "Home"],
-	["Esc", "Settings"],
-] as const;

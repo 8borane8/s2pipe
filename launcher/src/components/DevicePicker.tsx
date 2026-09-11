@@ -23,7 +23,7 @@ export function DevicePicker({
 	onRefresh,
 }: DevicePickerProps) {
 	return (
-		<div class="select-with-button">
+		<div className="select-with-button">
 			<select
 				id={id}
 				value={value}

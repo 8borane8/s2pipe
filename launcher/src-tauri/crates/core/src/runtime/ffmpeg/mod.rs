@@ -6,10 +6,11 @@ use std::process::Command;
 
 use crate::config::AppConfig;
 use crate::utils::bin::{bin_path, ensure_downloaded};
+use crate::utils::paths::log_path;
 use crate::utils::process::spawn_logged;
 
 use encoder::Backend;
-use runner::{log_path, run};
+use runner::run;
 
 const FFMPEG_VERSION: &str = "9.0";
 const RTSP_VIDEO: &str = "rtsp://127.0.0.1:8554/switch";

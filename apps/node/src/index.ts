@@ -9,4 +9,5 @@ const httpServer = new HttpServer()
 	.use(mainRouter);
 
 export type AppRouter = typeof httpServer;
+console.info(`node :${config.nodePort}`);
 httpServer.listen(config.nodePort);

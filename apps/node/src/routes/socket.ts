@@ -5,11 +5,12 @@ import {
 	addViewer,
 	dropViewer,
 	forEachViewer,
-	padOf,
-	playingCount,
-	playPad,
+	occupiedSeats,
+	ownsSeat,
+	padsOf,
+	playPads,
 	viewerCount,
-	watchPad,
+	watchPads,
 } from "@/services/sockets.ts";
 import type { ClientMessage, ServerMessage } from "@s2pipe/shared/types/node";
 
@@ -29,7 +30,7 @@ async function currentStatus(): Promise<ServerMessage> {
 		data: {
 			capture,
 			pico: picoStatus(),
-			playing: playingCount(),
+			occupied: occupiedSeats(),
 		},
 	};
 }
@@ -46,6 +47,12 @@ setInterval(() => {
 		void pushStatus();
 	});
 }, 2000);
+
+function resetSeats(indices: number[]): void {
+	if (!indices.length) return;
+	for (const seat of indices) clearPad(seat);
+	void pushStatus();
+}
 
 function bind(ws: WebSocket): void {
 	addViewer(ws);
@@ -67,25 +74,23 @@ function bind(ws: WebSocket): void {
 			const msg = JSON.parse(event.data) as ClientMessage;
 			switch (msg.op) {
 				case "play": {
-					const existing = padOf(ws);
-					const seat = playPad(ws);
-					send(ws, { op: "play", data: { playing: seat !== undefined } });
-					if (existing === undefined && seat !== undefined) {
-						clearPad(seat);
-						void pushStatus();
-					}
+					const previous = padsOf(ws);
+					const raw = msg.data?.count;
+					const count = typeof raw === "number" && Number.isFinite(raw) ? raw : 1;
+					const assigned = playPads(ws, count);
+					send(ws, { op: "play", data: { seats: assigned } });
+					resetSeats([
+						...previous.filter((seat) => !assigned.includes(seat)),
+						...assigned.filter((seat) => !previous.includes(seat)),
+					]);
 					return;
 				}
 				case "watch": {
-					const released = watchPad(ws);
-					if (released === undefined) return;
-					clearPad(released);
-					void pushStatus();
+					resetSeats(watchPads(ws));
 					return;
 				}
 				case "pad": {
-					const seat = padOf(ws);
-					if (seat !== undefined) setPad(seat, msg.data);
+					if (ownsSeat(ws, msg.seat)) setPad(msg.seat, msg.data);
 					return;
 				}
 			}
@@ -98,9 +103,7 @@ function bind(ws: WebSocket): void {
 		clearInterval(heartbeat);
 		const released = dropViewer(ws);
 		setWakeHold(viewerCount() > 0);
-		if (released === undefined) return;
-		clearPad(released);
-		void pushStatus();
+		resetSeats(released);
 	});
 }
 

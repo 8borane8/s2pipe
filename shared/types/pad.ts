@@ -1,4 +1,4 @@
-export const PAD_COUNT = 4;
+export const PAD_COUNT = 8;
 
 export const PAD_CENTER = 128;
 

@@ -1,3 +1,4 @@
+#include "packet.h"
 #include "tusb.h"
 
 #include <string.h>
@@ -6,16 +7,13 @@
 #define TUD_HID_INOUT_DESC_LEN (9 + 9 + 7 + 7)
 #endif
 
-/* Four HORI Pokkén HIDs (VID 0x0F0D / PID 0x0092, same report as GP2040-CE). */
+/* Eight HORI Pokkén HIDs (VID 0x0F0D / PID 0x0092, same report as GP2040-CE). */
 
-#define EPNUM_HID0_OUT 0x01
-#define EPNUM_HID0_IN 0x81
-#define EPNUM_HID1_OUT 0x02
-#define EPNUM_HID1_IN 0x82
-#define EPNUM_HID2_OUT 0x03
-#define EPNUM_HID2_IN 0x83
-#define EPNUM_HID3_OUT 0x04
-#define EPNUM_HID3_IN 0x84
+#define HID_PAD(_n, _str, _epout, _epin) \
+	TUD_HID_INOUT_DESCRIPTOR( \
+		_n, _str, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), \
+		_epout, _epin, CFG_TUD_HID_EP_BUFSIZE, 1 \
+	)
 
 static uint8_t const desc_device[] = {
 	0x12, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x40,
@@ -34,34 +32,35 @@ uint8_t const desc_hid_report[] = {
 
 _Static_assert(sizeof(desc_hid_report) == 86, "GP2040 / LUFA Pokken report descriptor is 86 bytes");
 
-#define CONFIG_LEN (TUD_CONFIG_DESC_LEN + (4 * TUD_HID_INOUT_DESC_LEN))
+#define CONFIG_LEN (TUD_CONFIG_DESC_LEN + (PAD_COUNT * TUD_HID_INOUT_DESC_LEN))
 
 static uint8_t const desc_configuration[] = {
-	TUD_CONFIG_DESCRIPTOR(1, 4, 0, CONFIG_LEN, 0x80, 500),
-	TUD_HID_INOUT_DESCRIPTOR(
-		0, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report),
-		EPNUM_HID0_OUT, EPNUM_HID0_IN, CFG_TUD_HID_EP_BUFSIZE, 1
-	),
-	TUD_HID_INOUT_DESCRIPTOR(
-		1, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report),
-		EPNUM_HID1_OUT, EPNUM_HID1_IN, CFG_TUD_HID_EP_BUFSIZE, 1
-	),
-	TUD_HID_INOUT_DESCRIPTOR(
-		2, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report),
-		EPNUM_HID2_OUT, EPNUM_HID2_IN, CFG_TUD_HID_EP_BUFSIZE, 1
-	),
-	TUD_HID_INOUT_DESCRIPTOR(
-		3, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report),
-		EPNUM_HID3_OUT, EPNUM_HID3_IN, CFG_TUD_HID_EP_BUFSIZE, 1
-	),
+	TUD_CONFIG_DESCRIPTOR(1, PAD_COUNT, 0, CONFIG_LEN, 0x80, 500),
+	HID_PAD(0, 3, 0x01, 0x81),
+	HID_PAD(1, 4, 0x02, 0x82),
+	HID_PAD(2, 5, 0x03, 0x83),
+	HID_PAD(3, 6, 0x04, 0x84),
+	HID_PAD(4, 7, 0x05, 0x85),
+	HID_PAD(5, 8, 0x06, 0x86),
+	HID_PAD(6, 9, 0x07, 0x87),
+	HID_PAD(7, 10, 0x08, 0x88),
 };
 
-_Static_assert(sizeof(desc_configuration) == 137, "four Pokken IN+OUT interfaces = 137-byte config");
+_Static_assert(sizeof(desc_configuration) == 265, "eight Pokken IN+OUT interfaces = 265-byte config");
+_Static_assert(PAD_COUNT == 8, "usb_descriptors lists eight HID pads");
 
 char const *string_desc_arr[] = {
 	(const char[]){ 0x09, 0x04 },
 	"HORI CO.,LTD.",
 	"POKKEN CONTROLLER",
+	"P1",
+	"P2",
+	"P3",
+	"P4",
+	"P5",
+	"P6",
+	"P7",
+	"P8",
 };
 
 static uint16_t _desc_str[32];

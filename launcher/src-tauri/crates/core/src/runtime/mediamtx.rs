@@ -2,8 +2,8 @@ use std::process::Command;
 
 use crate::config::AppConfig;
 use crate::utils::bin::{bin_path, ensure_downloaded};
-use crate::utils::paths::app_directory;
-use crate::utils::process::spawn_detached;
+use crate::utils::paths::{app_directory, log_path};
+use crate::utils::process::spawn_logged;
 
 const MEDIAMTX_VERSION: &str = "1.20.1";
 
@@ -83,7 +83,7 @@ pub fn start() -> Result<u32, String> {
     let mut command = Command::new(binary);
     command.arg(&config);
     command.current_dir(app_directory()?);
-    spawn_detached(command, "MediaMTX")
+    spawn_logged(command, "MediaMTX", &log_path("mediamtx")?)
 }
 
 fn config_path() -> Result<std::path::PathBuf, String> {

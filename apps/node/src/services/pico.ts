@@ -114,7 +114,8 @@ async function flush(): Promise<void> {
 			picoError = null;
 		}
 	} catch (error) {
-		picoError = error instanceof Error ? error.message : String(error);
+		picoError = serialError(error);
+		console.error(`pico ${picoError}`);
 		closePico();
 	} finally {
 		flushing = false;
@@ -162,6 +163,14 @@ function serialPath(path: string): string {
 	return com ? `\\\\.\\${com}` : path;
 }
 
+function serialError(error: unknown): string {
+	const message = error instanceof Error ? error.message : String(error);
+	if (Deno.build.os === "linux" && /permission denied/i.test(message)) {
+		return `${message} (add your user to dialout, then replug)`;
+	}
+	return message;
+}
+
 async function setSerialBaud(path: string): Promise<void> {
 	let command: Deno.Command;
 	if (Deno.build.os === "windows") {
@@ -187,6 +196,7 @@ async function setSerialBaud(path: string): Promise<void> {
 				"-ixon",
 				"-ixoff",
 				"clocal",
+				"-hupcl",
 			],
 			stdout: "piped",
 			stderr: "piped",
@@ -201,7 +211,6 @@ async function setSerialBaud(path: string): Promise<void> {
 		throw new Error(`serial baud ${SERIAL_BAUD} failed: ${detail}`);
 	}
 
-	// `mode` exclusive-opens the port; give Windows a beat to release it.
 	if (Deno.build.os === "windows") {
 		await new Promise((resolve) => setTimeout(resolve, 50));
 	}
@@ -214,12 +223,15 @@ async function openPico(): Promise<void> {
 		await setSerialBaud(config.picoSerial);
 		file = await Deno.open(serialPath(config.picoSerial), { read: true, write: true });
 		picoError = null;
+		console.info(`pico open ${config.picoSerial}`);
 		dirty = true;
 		startFlush();
 		if (wakeHold) queueWake();
 		await flush();
 	} catch (error) {
-		picoError = error instanceof Error ? error.message : String(error);
+		const message = serialError(error);
+		if (picoError !== message) console.error(`pico ${message}`);
+		picoError = message;
 		closePico();
 	}
 }

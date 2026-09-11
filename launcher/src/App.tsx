@@ -586,11 +586,11 @@ function App() {
 		return (
 			<main>
 				<header>
-					<h1 class="brand">
+					<h1 className="brand">
 						<span>s2</span>pipe
 					</h1>
 
-					<p class="pill">
+					<p className="pill">
 						Loading...
 					</p>
 				</header>
@@ -611,12 +611,12 @@ function App() {
 	return (
 		<main>
 			<header>
-				<h1 class="brand">
+				<h1 className="brand">
 					<span>s2</span>pipe
 				</h1>
 
 				<p
-					class="pill"
+					className="pill"
 					data-ok={status === Status.ONLINE ? "true" : status === Status.ERROR ? "false" : undefined}
 					data-busy={status === Status.CONNECTING || status === Status.STOPPING ? "true" : undefined}
 				>
@@ -625,7 +625,7 @@ function App() {
 			</header>
 
 			<form onSubmit={handleSubmit}>
-				<div class="form-body">
+				<div className="form-body">
 					{/* ---------------------------------------------------------------- */}
 					{/* Node & Client                                                     */}
 					{/* ---------------------------------------------------------------- */}
@@ -701,8 +701,8 @@ function App() {
 						)}
 
 						{advancedMode && (
-							<div class="fields-grid advanced">
-								<div class="field">
+							<div className="fields-grid advanced">
+								<div className="field">
 									<label>
 										<span>Node port</span>
 
@@ -721,7 +721,7 @@ function App() {
 									</label>
 								</div>
 
-								<div class="field">
+								<div className="field">
 									<label>
 										<span>Client port</span>
 
@@ -749,7 +749,7 @@ function App() {
 					{/* ---------------------------------------------------------------- */}
 
 					{advancedMode && (
-						<fieldset class="advanced">
+						<fieldset className="advanced">
 							<section>
 								<h2>Media / ICE</h2>
 
@@ -758,8 +758,8 @@ function App() {
 								</p>
 							</section>
 
-							<div class="fields-grid advanced">
-								<div class="field">
+							<div className="fields-grid advanced">
+								<div className="field">
 									<label>
 										<span>ICE IP</span>
 
@@ -779,7 +779,7 @@ function App() {
 									</label>
 								</div>
 
-								<div class="field">
+								<div className="field">
 									<label>
 										<span>ICE port (UDP)</span>
 
@@ -836,7 +836,7 @@ function App() {
 							</small>
 						</label>
 
-						<div class="field">
+						<div className="field">
 							<label>
 								<span>
 									Audio source
@@ -858,15 +858,15 @@ function App() {
 							</label>
 						</div>
 
-						<div class="presets-block">
+						<div className="presets-block">
 							<span>Resolution</span>
 
-							<div class="presets">
+							<div className="presets">
 								{RESOLUTION_PRESETS.map((preset) => (
 									<button
 										type="button"
 										key={preset.key}
-										class={`preset-btn${
+										className={`preset-btn${
 											isResolutionActive(
 													preset.width,
 													preset.height,
@@ -892,15 +892,15 @@ function App() {
 							</div>
 						</div>
 
-						<div class="presets-block">
+						<div className="presets-block">
 							<span>FPS</span>
 
-							<div class="presets">
+							<div className="presets">
 								{FPS_PRESETS.map((fps) => (
 									<button
 										type="button"
 										key={fps}
-										class={`preset-btn${isFpsActive(fps) ? " active" : ""}`}
+										className={`preset-btn${isFpsActive(fps) ? " active" : ""}`}
 										onClick={() =>
 											updateConfig(
 												"captureFps",
@@ -915,8 +915,8 @@ function App() {
 
 						{advancedMode && (
 							<>
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>Encoder</span>
 
@@ -950,7 +950,7 @@ function App() {
 										</label>
 									</div>
 
-									<div class="field">
+									<div className="field">
 										<label>
 											<span>Codec</span>
 
@@ -983,8 +983,8 @@ function App() {
 										: "H.264 plays everywhere. Auto falls back to the CPU when no GPU encoder answers."}
 								</small>
 
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>Width</span>
 
@@ -1006,7 +1006,7 @@ function App() {
 										</label>
 									</div>
 
-									<div class="field">
+									<div className="field">
 										<label>
 											<span>Height</span>
 
@@ -1029,8 +1029,8 @@ function App() {
 									</div>
 								</div>
 
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>FPS</span>
 
@@ -1053,7 +1053,7 @@ function App() {
 										</label>
 									</div>
 
-									<div class="field">
+									<div className="field">
 										<label>
 											<span>
 												Capture format
@@ -1082,8 +1082,8 @@ function App() {
 									</div>
 								</div>
 
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>
 												Video bitrate
@@ -1106,8 +1106,8 @@ function App() {
 									</div>
 								</div>
 
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>
 												Capture device
@@ -1129,7 +1129,7 @@ function App() {
 										</label>
 									</div>
 
-									<div class="field">
+									<div className="field">
 										<label>
 											<span>
 												HDMI audio (ALSA)
@@ -1187,8 +1187,8 @@ function App() {
 						</label>
 
 						{advancedMode && (
-							<div class="fields-grid advanced">
-								<div class="field">
+							<div className="fields-grid advanced">
+								<div className="field">
 									<label>
 										<span>Manual port</span>
 
@@ -1224,13 +1224,13 @@ function App() {
 							</p>
 						</section>
 
-						<div class="select-with-button">
+						<div className="select-with-button">
 							<button
 								type="button"
 								onClick={() => void handleScanPad()}
 								disabled={scanning}
 								id="scan-pad-button"
-								class={bluetoothError ? "button-error" : ""}
+								className={bluetoothError ? "button-error" : ""}
 							>
 								{scanning
 									? "Listening..."
@@ -1248,8 +1248,8 @@ function App() {
 
 						{advancedMode && (
 							<>
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>
 												Switch Bluetooth MAC
@@ -1271,7 +1271,7 @@ function App() {
 										</label>
 									</div>
 
-									<div class="field">
+									<div className="field">
 										<label>
 											<span>
 												Controller Bluetooth MAC
@@ -1294,8 +1294,8 @@ function App() {
 									</div>
 								</div>
 
-								<div class="fields-grid advanced">
-									<div class="field">
+								<div className="fields-grid advanced">
+									<div className="field">
 										<label>
 											<span>
 												Controller Bluetooth PID
@@ -1334,8 +1334,8 @@ function App() {
 							</p>
 						</section>
 
-						<div class="toggles">
-							<label class="toggle">
+						<div className="toggles">
+							<label className="toggle">
 								<input
 									type="checkbox"
 									checked={config.launchAtStartup}
@@ -1347,7 +1347,7 @@ function App() {
 										)}
 								/>
 
-								<span class="toggle-ui" />
+								<span className="toggle-ui" />
 
 								<div>
 									<strong>
@@ -1367,8 +1367,8 @@ function App() {
 				{/* Bottom controls                                                    */}
 				{/* ---------------------------------------------------------------- */}
 
-				<div class="mode-row">
-					<label class="switch">
+				<div className="mode-row">
+					<label className="switch">
 						<input
 							type="checkbox"
 							checked={advancedMode}
@@ -1380,17 +1380,17 @@ function App() {
 								)}
 						/>
 
-						<span class="switch-ui" />
+						<span className="switch-ui" />
 
-						<span class="switch-label">
+						<span className="switch-label">
 							Advanced settings
 						</span>
 					</label>
 
-					<div class="actions">
+					<div className="actions">
 						<button
 							type="button"
-							class="stop"
+							className="stop"
 							disabled={status !== Status.ONLINE}
 							onClick={() => void stopS2Pipe()}
 						>
@@ -1399,10 +1399,9 @@ function App() {
 
 						<button
 							type="submit"
-							class="start"
-							disabled={status === Status.ONLINE ||
-								status === Status.CONNECTING ||
-								status === Status.STOPPING}
+							className={status === Status.CONNECTING ? "start starting" : "start"}
+							disabled={status === Status.ONLINE || status === Status.STOPPING}
+							aria-busy={status === Status.CONNECTING ? "true" : undefined}
 						>
 							{status === Status.CONNECTING ? "Starting..." : "Start s2pipe"}
 						</button>

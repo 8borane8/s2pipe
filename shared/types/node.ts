@@ -16,7 +16,7 @@ export type PicoStatus = {
 export type StatusData = {
 	capture: CaptureStatus;
 	pico: PicoStatus;
-	playing: number;
+	occupied: number[];
 };
 
 export type NodeStatus = {
@@ -25,12 +25,12 @@ export type NodeStatus = {
 } & StatusData;
 
 export type ClientMessage =
-	| { op: "play" }
+	| { op: "play"; data: { count: number } }
 	| { op: "watch" }
-	| { op: "pad"; data: PadState }
+	| { op: "pad"; data: PadState; seat: number }
 	| { op: "pong" };
 
 export type ServerMessage =
 	| { op: "status"; data: StatusData }
-	| { op: "play"; data: { playing: boolean } }
+	| { op: "play"; data: { seats: number[] } }
 	| { op: "ping" };

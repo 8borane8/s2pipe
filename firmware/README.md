@@ -1,6 +1,6 @@
 # Pico firmware
 
-4 HORI Pokkén HID pads (VID `0x0F0D` / PID `0x0092`). UART 64-byte frames -> USB.
+8 HORI Pokkén HID pads (VID `0x0F0D` / PID `0x0092`). UART 84-byte frames -> USB.
 
 ## Flash
 

@@ -1,17 +1,11 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { Eye, Gamepad2, Maximize, Minimize, Settings, Volume2, VolumeX, X } from "lucide-preact";
+import { Gamepad2, Maximize, Minimize, Settings, Volume2, VolumeX, X } from "lucide-preact";
 
 import type { CaptureStatus, ClientMessage, PicoStatus, ServerMessage } from "@s2pipe/shared/types/node";
-import { PAD_COUNT, type PadState, samePad } from "@s2pipe/shared/types/pad";
+import { neutralPad, PAD_COUNT, type PadState, samePad } from "@s2pipe/shared/types/pad";
 
-import {
-	createInputTracker,
-	type GamepadOption,
-	type InputSource,
-	KEYBOARD_HELP,
-	listGamepads,
-} from "../utils/input.ts";
+import { createInputTracker, type GamepadOption, listGamepads } from "../utils/input.ts";
 import {
 	type AudioWhepHandle,
 	onWhepDead,
@@ -51,8 +45,19 @@ function picoTitle(pico: PicoStatus | null): string | undefined {
 	return parts.length ? parts.join("\n") : undefined;
 }
 
-function firstPad(list: GamepadOption[]): InputSource | null {
-	return list[0] ? { kind: "gamepad", index: list[0].index } : null;
+function padLabel(id: string): string {
+	const name = id.split("(")[0]?.trim();
+	return name || id;
+}
+
+const NEUTRAL = neutralPad();
+
+function sameIds(a: number[], b: number[]): boolean {
+	return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+function selectedPads(pads: GamepadOption[], chosen: number[]): GamepadOption[] {
+	return pads.filter((pad) => chosen.includes(pad.index));
 }
 
 function streamBanner(
@@ -84,16 +89,17 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const inputRef = useRef<ReturnType<typeof createInputTracker> | null>(null);
 	const statsPrev = useRef<{ bytes: number; at: number } | null>(null);
 	const toastSeq = useRef(0);
-	const playRequested = useRef(false);
+	const pendingPlays = useRef(0);
 	const persistPrefs = useRef(false);
 
-	const playing = useSignal(false);
-	const playingCount = useSignal(0);
 	const connected = useSignal(false);
 	const capture = useSignal<CaptureStatus | null>(null);
 	const pico = useSignal<PicoStatus | null>(null);
 	const pads = useSignal<GamepadOption[]>([]);
-	const source = useSignal<InputSource | null>(null);
+	const chosen = useSignal<number[]>([]);
+	const seats = useSignal<number[]>([]);
+	const occupied = useSignal<number[]>([]);
+	const livePads = useSignal<number[]>([]);
 	const settings = useSignal(false);
 	const muted = useSignal(false);
 	const volume = useSignal(1);
@@ -140,7 +146,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		let cancelled = false;
 		let videoHandle: WhepHandle | null = null;
 		let audioHandle: AudioWhepHandle | null = null;
-		let retryTimer = 0;
+		let retryTimer: ReturnType<typeof setTimeout> | undefined;
 		let iceHinted = false;
 
 		const cleanupWhep = () => {
@@ -219,7 +225,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	// Gestion WebSocket (Statut et Commandes)
 	useEffect(() => {
 		let socket: WebSocket | null = null;
-		let retryTimer = 0;
+		let retryTimer: ReturnType<typeof setTimeout> | undefined;
 		let isClosed = false;
 
 		function connectWs() {
@@ -229,6 +235,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 			socket.addEventListener("open", () => {
 				connected.value = true;
+				const count = chosen.value.length;
+				if (!count) return;
+				pendingPlays.current += 1;
+				send(socket, { op: "play", data: { count } });
 			});
 
 			socket.addEventListener("message", (event) => {
@@ -236,15 +246,19 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				try {
 					const msg = JSON.parse(event.data) as ServerMessage;
 					if (msg.op === "play") {
-						if (!playRequested.current) return;
-						playRequested.current = false;
-						playing.value = msg.data.playing;
-						if (!msg.data.playing) toast("All remote pads are taken.");
+						pendingPlays.current = Math.max(0, pendingPlays.current - 1);
+						const granted = msg.data.seats;
+						seats.value = granted;
+						if (pendingPlays.current > 0) return;
+						const selected = selectedPads(pads.value, chosen.value);
+						if (granted.length >= selected.length) return;
+						chosen.value = selected.slice(0, granted.length).map((pad) => pad.index);
+						toast(granted.length ? "Not enough remote pads." : "All remote pads are taken.");
 					} else if (msg.op === "status") {
 						capture.value = msg.data.capture;
 						if (!msg.data.capture.running) live.value = false;
 						pico.value = msg.data.pico;
-						playingCount.value = msg.data.playing;
+						occupied.value = msg.data.occupied;
 					} else if (msg.op === "ping") {
 						send(socket, { op: "pong" });
 					}
@@ -255,8 +269,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 			socket.addEventListener("close", () => {
 				wsRef.current = null;
-				playRequested.current = false;
-				playing.value = false;
+				pendingPlays.current = 0;
+				seats.value = [];
 				connected.value = false;
 				if (!isClosed) {
 					retryTimer = globalThis.setTimeout(connectWs, 1500);
@@ -282,11 +296,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 		const updatePads = () => {
 			const next = listGamepads();
+			const still = chosen.value.filter((index) => next.some((pad) => pad.index === index));
+			const lost = still.length !== chosen.value.length;
 			pads.value = next;
-			const current = source.value;
-			if (!current || !next.some((pad) => pad.index === current.index)) {
-				source.value = firstPad(next);
-			}
+			chosen.value = still;
+			if (lost) syncSeats(still.length);
 		};
 
 		updatePads();
@@ -303,28 +317,60 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 	// Boucle d'envoi des inputs de la manette
 	useEffect(() => {
-		if (!playing.value) return;
 		let frame = 0;
-		let lastState: PadState | null = null;
+		const lastBySeat = new Map<number, PadState>();
+		let lastAssignedKey = "";
 
 		const loop = () => {
 			frame = requestAnimationFrame(loop);
 			const tracker = inputRef.current;
+			if (!tracker) return;
+
+			const sampled = new Map<number, PadState>();
+			const active: number[] = [];
+			for (const pad of pads.value) {
+				const state = tracker.sample(pad.index, false);
+				sampled.set(pad.index, state);
+				if (!samePad(state, NEUTRAL)) active.push(pad.index);
+			}
+			if (!sameIds(active, livePads.value)) livePads.value = active;
+
 			const ws = wsRef.current;
-			const pad = source.value;
+			const assigned = seats.value;
+			const assignedKey = assigned.join(",");
+			if (!ws || ws.readyState !== WebSocket.OPEN || !assigned.length) {
+				if (lastAssignedKey) {
+					lastBySeat.clear();
+					lastAssignedKey = "";
+				}
+				return;
+			}
 
-			if (!tracker || !pad || !ws || ws.readyState !== WebSocket.OPEN) return;
+			if (assignedKey !== lastAssignedKey) {
+				lastBySeat.clear();
+				lastAssignedKey = assignedKey;
+			}
 
-			const state = tracker.sample(pad);
-			if (lastState !== null && samePad(lastState, state)) return;
+			const selected = selectedPads(pads.value, chosen.value);
 
-			lastState = state;
-			send(ws, { op: "pad", data: state });
+			for (let i = 0; i < assigned.length; i++) {
+				const seat = assigned[i]!;
+				const pad = selected[i];
+				const state = i === 0
+					? tracker.sample(pad ? pad.index : null, true)
+					: pad
+					? sampled.get(pad.index) ?? NEUTRAL
+					: NEUTRAL;
+				const previous = lastBySeat.get(seat);
+				if (previous && samePad(previous, state)) continue;
+				lastBySeat.set(seat, state);
+				send(ws, { op: "pad", data: state, seat });
+			}
 		};
 
 		frame = requestAnimationFrame(loop);
 		return () => cancelAnimationFrame(frame);
-	}, [playing.value]);
+	}, []);
 
 	// Raccourci Clavier (Échap pour les paramètres)
 	useEffect(() => {
@@ -373,16 +419,24 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		return () => document.removeEventListener("fullscreenchange", onFs);
 	}, []);
 
-	function play(): void {
-		if (playing.value || wsRef.current?.readyState !== WebSocket.OPEN) return;
-		playRequested.current = true;
-		send(wsRef.current, { op: "play" });
+	function syncSeats(count: number): void {
+		const ws = wsRef.current;
+		if (!ws || ws.readyState !== WebSocket.OPEN) return;
+		if (count > 0) {
+			pendingPlays.current += 1;
+			send(ws, { op: "play", data: { count } });
+			return;
+		}
+		pendingPlays.current = 0;
+		seats.value = [];
+		send(ws, { op: "watch" });
 	}
 
-	function watch(): void {
-		playRequested.current = false;
-		playing.value = false;
-		send(wsRef.current, { op: "watch" });
+	function toggleSeat(index: number): void {
+		const claimed = chosen.value.includes(index);
+		if (!claimed && occupied.value.length >= PAD_COUNT) return;
+		chosen.value = claimed ? chosen.value.filter((item) => item !== index) : [...chosen.value, index];
+		syncSeats(chosen.value.length);
 	}
 
 	function onStageClick(): void {
@@ -405,8 +459,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}
 
 	const hideHud = fullscreen.value;
-	const padsFull = playingCount.value >= PAD_COUNT && !playing.value;
 	const banner = streamBanner(connected.value, capture.value, live.value);
+	const selected = selectedPads(pads.value, chosen.value);
+	const seatByIndex = new Map(selected.map((pad, i) => [pad.index, seats.value[i]] as const));
 
 	return (
 		<section
@@ -431,14 +486,14 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			/>
 
 			{banner && (
-				<div class="play-banner">
+				<div>
 					<h2>{banner.title}</h2>
 					<p>{banner.body}</p>
 				</div>
 			)}
 
 			{showStats.value && (
-				<dl class="play-stats">
+				<dl>
 					<div>
 						<dt>Bitrate</dt>
 						<dd>{stats.value ? `${stats.value.bitrateKbps} kb/s` : "-"}</dd>
@@ -454,71 +509,72 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				</dl>
 			)}
 
-			<div class="play-hud" onClick={(event) => event.stopPropagation()}>
-				<div class="play-top">
-					<span class="play-brand">
+			<div onClick={(event) => event.stopPropagation()}>
+				<div>
+					<span className="brand">
 						<span>s2</span>pipe
 					</span>
-					<div class="play-slots">
-						<span class="play-count">{playingCount.value}/{PAD_COUNT} playing</span>
-						<button
-							type="button"
-							class="play-slot"
-							data-state={playing.value ? "you" : "free"}
-							disabled={padsFull}
-							onClick={play}
-						>
-							<Gamepad2 size={14} aria-hidden="true" />
-							Play
-						</button>
-						<button
-							type="button"
-							class="play-slot"
-							data-state={!playing.value ? "you" : "free"}
-							onClick={watch}
-						>
-							<Eye size={14} aria-hidden="true" />
-							Watch
-						</button>
-					</div>
-					<div class="play-status">
-						<span class="pill" data-ok={capture.value?.running ? "true" : "false"}>
+					<span>
+						<Gamepad2 size={13} aria-hidden="true" />
+						<span>
+							<strong>{occupied.value.length}</strong>
+							<span>/{PAD_COUNT} playing</span>
+						</span>
+					</span>
+					<div>
+						<span className="pill" data-ok={capture.value?.running ? "true" : "false"}>
 							Capture {capture.value?.running ? "live" : "down"}
 						</span>
 						<span
-							class="pill"
+							className="pill"
 							data-ok={pico.value?.connected ? "true" : "false"}
 							title={picoTitle(pico.value)}
 						>
 							Pico {pico.value?.connected ? "ready" : "off"}
 						</span>
-						<span class="pill" data-ok={connected.value ? "true" : "false"}>
+						<span className="pill" data-ok={connected.value ? "true" : "false"}>
 							{connected.value ? "Connected" : "Connecting"}
 						</span>
 					</div>
 				</div>
 
-				<div class="play-bottom">
-					<label class="play-controller">
-						<select
-							aria-label="Controller"
-							value={source.value ? String(source.value.index) : ""}
-							onChange={(e) => {
-								const val = Number((e.target as HTMLSelectElement).value);
-								if (Number.isFinite(val)) source.value = { kind: "gamepad", index: val };
-							}}
-						>
-							{pads.value.length === 0 && <option value="" disabled>Connect a gamepad</option>}
-							{pads.value.map((pad) => <option value={String(pad.index)}>{pad.id}</option>)}
-						</select>
-						{connected.value && !playing.value && (
-							<span class="play-hint">Click Play, then use a gamepad.</span>
-						)}
-					</label>
-					<div class="play-tools">
+				<div>
+					{pads.value.length > 0
+						? (
+							<div>
+								{pads.value.map((pad) => {
+									const seat = seatByIndex.get(pad.index);
+									const claimed = chosen.value.includes(pad.index);
+									const full = occupied.value.length >= PAD_COUNT && !claimed;
+									const state = seat !== undefined ? "live" : claimed ? "ready" : "off";
+									const status = seat !== undefined
+										? `P${seat + 1}`
+										: claimed
+										? "..."
+										: full
+										? "Full"
+										: "Play";
+									return (
+										<button
+											type="button"
+											key={pad.index}
+											data-state={state}
+											data-active={livePads.value.includes(pad.index) ? "true" : undefined}
+											disabled={full || !connected.value}
+											onClick={() => toggleSeat(pad.index)}
+										>
+											<span>{padLabel(pad.id)}</span>
+											<span>{status}</span>
+										</button>
+									);
+								})}
+							</div>
+						)
+						: <p>Connect a gamepad, then click it to play.</p>}
+					<div>
 						<button
 							type="button"
-							class="btn btn-icon"
+							className="btn btn-icon"
 							aria-label={muted.value ? "Unmute" : "Mute"}
 							onClick={() => muted.value = !muted.value}
 						>
@@ -526,7 +582,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						</button>
 						<button
 							type="button"
-							class="btn btn-icon"
+							className="btn btn-icon"
 							aria-label={fullscreen.value ? "Exit fullscreen" : "Fullscreen"}
 							onClick={toggleFullscreen}
 						>
@@ -534,7 +590,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						</button>
 						<button
 							type="button"
-							class="btn btn-icon"
+							className="btn btn-icon"
 							aria-label="Settings"
 							onClick={() => settings.value = !settings.value}
 						>
@@ -545,12 +601,12 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			</div>
 
 			{settings.value && (
-				<aside class="play-settings" onClick={(event) => event.stopPropagation()}>
+				<aside onClick={(event) => event.stopPropagation()}>
 					<div>
 						<h2>Settings</h2>
 						<button
 							type="button"
-							class="btn btn-icon"
+							className="btn btn-icon"
 							aria-label="Close settings"
 							onClick={() => settings.value = false}
 						>
@@ -558,15 +614,15 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						</button>
 					</div>
 
-					<div class="field">
+					<div className="field">
 						<span>Node</span>
-						<div class="play-node">
+						<div>
 							<p>{nodeUrl}</p>
-							{!nodeLocked && <a class="btn" href="/set-node">Modify</a>}
+							{!nodeLocked && <a className="btn" href="/set-node">Modify</a>}
 						</div>
 					</div>
 
-					<label class="field">
+					<label className="field">
 						<span>Volume</span>
 						<input
 							type="range"
@@ -581,7 +637,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						/>
 					</label>
 
-					<label class="play-check">
+					<label>
 						<input
 							type="checkbox"
 							checked={fill.value}
@@ -590,7 +646,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						Fill (crop) instead of letterbox
 					</label>
 
-					<label class="play-check">
+					<label>
 						<input
 							type="checkbox"
 							checked={showStats.value}
@@ -599,26 +655,39 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						Overlay WebRTC stats
 					</label>
 
-					<section class="play-help">
-						<h3>Gamepad</h3>
-						<dl>
-							{KEYBOARD_HELP.map(([key, action]) => (
-								<div>
-									<dt>{key}</dt>
-									<dd>{action}</dd>
-								</div>
-							))}
-						</dl>
+					<section>
+						<h3>Home</h3>
 						<p>
-							Home / PS / Guide is Home. Capture / Share is Capture. Xbox Guide opens Windows Game Bar:
-							Settings &gt; Gaming &gt; Xbox Game Bar, turn off "Open Game Bar using this button on a
-							controller". Until then, View+Menu is Home.
+							Home on the Switch is the Xbox Guide / PS button. Capture / Share is Capture. Windows and
+							Steam often steal Guide before the browser can send Home.
 						</p>
+						<p>
+							Game Bar: Windows Settings, Gaming, Xbox Game Bar. Turn off "Open Xbox Game Bar using this
+							button on a controller".
+						</p>
+						<p>
+							Steam: Steam Settings, Controller. Turn off "Guide button focuses Steam". If a Steam menu
+							still opens, disable Steam Input for this pad or quit Steam while you play.
+						</p>
+						<p>
+							Last resort: hold Minus and Plus together (View + Menu, Select + Start, or - and +). That
+							sends Home without using Guide.
+						</p>
+						<dl>
+							<div>
+								<dt>H / G</dt>
+								<dd>Home / Capture</dd>
+							</div>
+							<div>
+								<dt>Esc</dt>
+								<dd>Settings</dd>
+							</div>
+						</dl>
 					</section>
 				</aside>
 			)}
 
-			<ul class="play-toasts" aria-live="polite">
+			<ul aria-live="polite">
 				{toasts.value.map((item) => <li key={item.id}>{item.text}</li>)}
 			</ul>
 		</section>

@@ -29,7 +29,7 @@
 #define CFG_TUSB_MEM_ALIGN __attribute__((aligned(4)))
 #endif
 
-#define CFG_TUD_HID 4
+#define CFG_TUD_HID 8
 #define CFG_TUD_CDC 0
 #define CFG_TUD_MSC 0
 #define CFG_TUD_MIDI 0

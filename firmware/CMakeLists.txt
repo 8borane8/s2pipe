@@ -40,4 +40,4 @@ pico_enable_stdio_uart(s2pipe_pico 0)
 pico_add_extra_outputs(s2pipe_pico)
 
 pico_set_program_name(s2pipe_pico "s2pipe")
-pico_set_program_description(s2pipe_pico "s2pipe 4x HORI Pokken")
+pico_set_program_description(s2pipe_pico "s2pipe 8x HORI Pokken")

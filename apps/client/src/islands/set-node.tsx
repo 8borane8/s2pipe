@@ -45,13 +45,13 @@ export default function SetNode() {
 
 	return (
 		<article>
-			<p class="brand">
+			<p className="brand">
 				<span>s2</span>pipe
 			</p>
 			<h1>Connect the node</h1>
 			<p>Public URL of the machine running the node. Saved in a cookie on this browser.</p>
 			<form onSubmit={onSubmit}>
-				<label class="field">
+				<label className="field">
 					<span>Node URL</span>
 					<input
 						type="url"
@@ -64,8 +64,8 @@ export default function SetNode() {
 						onInput={(event) => url.value = (event.target as HTMLInputElement).value}
 					/>
 				</label>
-				{error.value && <p class="error">{error.value}</p>}
-				<button type="submit" class="btn btn-primary" disabled={pending.value}>
+				{error.value && <p className="error">{error.value}</p>}
+				<button type="submit" className="btn btn-primary" disabled={pending.value}>
 					{pending.value ? "Checking..." : "Test and save"}
 				</button>
 			</form>

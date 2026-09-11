@@ -4,7 +4,7 @@
 
 <p align="center">
 	<strong>Self-hosted Switch 2 cloud play</strong><br>
-	Stream the dock over WebRTC and play from any browser on the LAN, up to four pads through a Pico.
+	Stream the dock over WebRTC and play from any browser on the LAN, up to eight pads through a Pico.
 </p>
 
 <p align="center">
@@ -20,8 +20,8 @@
 	<img src="assets/result.png" alt="s2pipe in the browser" width="920">
 </p>
 
-The console stays on the capture PC. Up to four browsers see the picture over WebRTC and play with a gamepad or
-keyboard. Inputs go to a Raspberry Pico that shows up on the Switch as 4 USB pads.
+The console stays on the capture PC. Browsers see the picture over WebRTC. One browser can drive several gamepads at
+once. Inputs go to a Raspberry Pico that shows up on the Switch as 8 USB pads.
 
 The **s2pipe launcher** (Windows and Linux) downloads FFmpeg and MediaMTX, starts Node and the browser UI, and talks to
 the Pico. **No auth.** Trusted LAN only. Do not expose this on the Internet.
@@ -37,7 +37,7 @@ Browsers --WHEP + WebSocket--> node --UART--> Pico --USB--> Switch 2
 | **Launcher** | `launcher`    | GUI / CLI: configure and run the stack   |
 | **Node**     | `apps/node`   | HTTP, WebSocket, Pico serial, WHEP proxy |
 | **Client**   | `apps/client` | Browser UI                               |
-| **Firmware** | `firmware`    | Pico: UART in, 4 USB pads out            |
+| **Firmware** | `firmware`    | Pico: UART in, 8 USB pads out            |
 
 ## 1. Tested hardware
 
@@ -110,10 +110,15 @@ s2pipe start --help
 
 ## 6. Play
 
-Start in **Watch**. **Play** takes a Pico seat (max 4). **Watch** releases it. Pick a gamepad at the bottom. Esc =
-settings. The HUD stays on until fullscreen.
+Click a gamepad at the bottom to take a Pico seat (max 8 in total, several per browser). Click again to release it. Esc
+= settings. The HUD stays on until fullscreen.
 
-Pills: capture, Pico, WebSocket. `n/4 playing` is remote Pico seats, not Switch player numbers.
+`n/8 playing` is Pico seats taken, not Switch player numbers. Pills: capture, Pico, WebSocket.
+
+Home is Xbox Guide / PS. Turn off Windows Game Bar's controller shortcut (Settings, Gaming, Xbox Game Bar) and Steam's
+"Guide button focuses Steam". Last resort: hold Minus and Plus together (View + Menu).
+
+After updating s2pipe, **reflash the Pico**: the node and the firmware must agree on the same packet format.
 
 ## 7. Sleep wake
 
@@ -161,16 +166,17 @@ Firmware and packet: keep `apps/node/src/utils/packet.ts` in sync with `firmware
 
 | Route                     | What                                                         |
 | ------------------------- | ------------------------------------------------------------ |
-| `GET /health`             | Capture, Pico, `playing` count                               |
+| `GET /health`             | Capture, Pico, `occupied` seats                              |
 | `GET /socket`             | WebSocket                                                    |
 | `POST /switch/whep`       | Video WHEP; `PATCH` / `DELETE` `/switch/whep/:session`       |
 | `POST /switch-audio/whep` | Audio WHEP; `PATCH` / `DELETE` `/switch-audio/whep/:session` |
 
-- Client: `{ op: "play" }` / `{ op: "watch" }` / `{ op: "pad", data: PadState }`
-- Server: `{ op: "status", data: { capture, pico, playing } }` on join and when seats change
-- Server: `{ op: "play", data: { playing: boolean } }` after Play (`false` if all four seats are taken)
+- Client: `{ op: "play", data: { count } }` / `{ op: "watch" }` / `{ op: "pad", data: PadState, seat }`
+- Server: `{ op: "status", data: { capture, pico, occupied } }` on join and when seats change
+- Server: `{ op: "play", data: { seats: number[] } }` after a `play` (empty if none left)
 
-Join is Watch. Play takes a seat; Watch or closing the socket releases it.
+A socket starts with no seat. `play` claims `count` seats on that socket (or fewer if the lobby is full), so clicking a
+gamepad sends the new total. `watch` or closing the socket releases every seat held by that browser.
 
 ## License
 

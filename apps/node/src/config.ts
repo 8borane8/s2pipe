@@ -34,7 +34,7 @@ export const config = {
 	mediaHost: env("MEDIA_HOST", "127.0.0.1"),
 	mediaPort: 8889,
 	captureSource: env("CAPTURE_SOURCE", "test"),
-	picoSerial: env("PICO_SERIAL"),
+	picoSerial: env("PICO_SERIAL").trim(),
 	switchBtMac: parseMac(env("SWITCH_BT_MAC")),
 	controllerBtMac: parseMac(env("CONTROLLER_BT_MAC")),
 	controllerBtPid: parsePid(env("CONTROLLER_BT_PID"), 0x2069),

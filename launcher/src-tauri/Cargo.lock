@@ -4156,7 +4156,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "s2pipe"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "s2pipe-core",
@@ -4165,7 +4165,7 @@ dependencies = [
 
 [[package]]
 name = "s2pipe-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "btleplug",
  "dirs 6.0.0",
@@ -4186,7 +4186,7 @@ dependencies = [
 
 [[package]]
 name = "s2pipe-gui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "open",
  "s2pipe-core",

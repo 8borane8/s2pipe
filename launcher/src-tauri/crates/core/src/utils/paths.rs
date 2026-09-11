@@ -10,8 +10,8 @@ pub fn bins_dir() -> Result<PathBuf, String> {
     Ok(app_directory()?.join("bins"))
 }
 
-pub fn logs_dir() -> Result<PathBuf, String> {
-    Ok(app_directory()?.join("logs"))
+pub fn log_path(name: &str) -> Result<PathBuf, String> {
+    Ok(app_directory()?.join("logs").join(format!("{name}.log")))
 }
 
 pub fn ensure_app_directory() -> Result<(), String> {

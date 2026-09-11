@@ -14,7 +14,7 @@
 	user-select: none;
 }
 
-#play[data-idle="true"] .play-hud {
+#play[data-idle="true"] > div:not(:has(> h2)) {
 	opacity: 0;
 	pointer-events: none;
 	transition: none;
@@ -34,7 +34,9 @@
 	object-fit: cover;
 }
 
-.play-banner {
+#play > div:has(> h2) {
+	text-align: center;
+
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -48,13 +50,11 @@
 	inset: 0;
 	z-index: 1;
 
-	text-align: center;
-
 	background: rgb(0 0 0 / 0.55);
 	pointer-events: none;
 }
 
-.play-banner > h2 {
+#play > div:has(> h2) > h2 {
 	margin: 0;
 
 	font-size: var(--text-xl);
@@ -62,7 +62,7 @@
 	letter-spacing: -0.03em;
 }
 
-.play-banner > p {
+#play > div:has(> h2) > p {
 	max-width: 28rem;
 	margin: 0;
 
@@ -71,7 +71,7 @@
 	line-height: 1.45;
 }
 
-.play-hud {
+#play > div:not(:has(> h2)) {
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
@@ -95,10 +95,8 @@
 	pointer-events: none;
 }
 
-.play-top,
-.play-slots,
-.play-status,
-.play-tools {
+#play > div:not(:has(> h2)) > div:first-child,
+#play > div:not(:has(> h2)) > div:last-child > div:last-child {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
@@ -107,39 +105,81 @@
 	gap: var(--space-2);
 }
 
-.play-top {
+#play > div:not(:has(> h2)) > div:first-child {
 	justify-content: space-between;
 }
 
-.play-brand {
-	font-size: var(--text-sm);
-	font-weight: 700;
-	letter-spacing: -0.06em;
-
+#play > div:not(:has(> h2)) > div:first-child > .brand {
 	flex: 1;
 }
 
-.play-brand > span {
-	color: var(--accent);
-}
-
-.play-status {
-	justify-content: flex-end;
-	flex: 1;
-}
-
-.play-bottom {
+#play > div:not(:has(> h2)) > div:first-child > div:last-child {
 	display: flex;
 	flex-direction: row;
-	flex-wrap: nowrap;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	flex: 1;
+	gap: var(--space-2);
+}
+
+#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) {
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+
+	text-transform: uppercase;
+
+	display: inline-flex;
+	flex-direction: row;
 	justify-content: center;
 	align-items: center;
+	flex-wrap: nowrap;
+	flex: 0 0 auto;
+	gap: 6px;
+
+	padding: 0.25rem 0.65rem;
+
+	background: rgb(7 8 10 / 0.55);
+	border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+	border-radius: 99px;
+}
+
+#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) > svg {
+	color: var(--accent);
+	flex-shrink: 0;
+}
+
+#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) > span {
+	display: inline-flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: baseline;
+	flex-wrap: nowrap;
+	gap: 2px;
+}
+
+#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) > span > strong {
+	color: var(--text);
+	font-size: var(--text-sm);
+	font-weight: 700;
+}
+
+#play > div:not(:has(> h2)) > div:last-child {
+	display: flex;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	justify-content: flex-end;
+	align-items: center;
 	gap: var(--space-2);
+
+	padding-inline: 6.5rem;
 
 	position: relative;
 }
 
-.play-tools {
+#play > div:not(:has(> h2)) > div:last-child > div:last-child {
 	justify-content: flex-end;
 
 	position: absolute;
@@ -147,121 +187,126 @@
 	bottom: 0;
 }
 
-.play-slots,
-.play-status,
-.play-slot,
-.play-controller,
-.play-tools,
-.play-hud .btn {
+#play > div:not(:has(> h2)) > div:first-child > div:last-child,
+#play > div:not(:has(> h2)) > div:last-child > div:first-child,
+#play > div:not(:has(> h2)) > div:last-child > div:last-child,
+#play > div:not(:has(> h2)) .btn {
 	pointer-events: auto;
 }
 
-.play-count {
-	color: var(--text);
-	font-size: var(--text-sm);
-	font-weight: 600;
-
-	flex: 0 0 auto;
-
-	opacity: 0.7;
-}
-
-.play-slot,
-.play-hud .btn {
+#play > div:not(:has(> h2)) .btn {
 	color: var(--text);
 
 	background: rgb(7 8 10 / 0.55);
 	border: 1px solid rgb(255 255 255 / 0.12);
 }
 
-.play-slot:hover:not(:disabled),
-.play-hud .btn:hover {
+#play > div:not(:has(> h2)) .btn:hover {
 	border-color: var(--accent);
 }
 
-.play-slot {
-	height: 2.1rem;
-
-	font-size: var(--text-sm);
-	font-weight: 600;
-
-	display: inline-flex;
-	flex-direction: row;
-	justify-content: center;
-	align-items: center;
-	flex-wrap: nowrap;
-	gap: var(--space-1);
-
-	padding: 0 0.7rem;
-
-	border-radius: var(--radius);
-
-	cursor: pointer;
-}
-
-.play-slot[data-state="you"] {
-	color: var(--on-accent);
-
-	background: var(--accent);
-	border-color: var(--accent);
-}
-
-.play-slot:disabled {
-	opacity: 0.35;
-	cursor: not-allowed;
-}
-
-.play-controller {
+#play > div:not(:has(> h2)) > div:last-child > div:first-child {
+	width: auto;
 	min-width: 0;
+	max-width: min(28rem, 100%);
+	max-height: 40vh;
 
 	display: flex;
 	flex-direction: column;
-	align-items: center;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
 	gap: 0.35rem;
+
+	overflow-x: hidden;
+	overflow-y: auto;
 }
 
-.play-hint {
-	margin: 0;
-
-	color: var(--muted);
-	font-size: 0.75rem;
-	line-height: 1.3;
-	text-align: center;
-}
-
-.play-controller > select {
-	all: revert;
-	box-sizing: border-box;
-	min-width: min(18rem, calc(100vw - 10rem));
-	max-width: min(28rem, calc(100vw - 10rem));
-	height: 2.5rem;
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button {
+	min-width: 0;
 
 	color: var(--text);
-	font-family: var(--font-sans);
-	font-size: var(--text-md);
+	font-family: inherit;
+	font-size: var(--text-sm);
 
-	text-align: center;
-	text-align-last: center;
+	text-align: left;
 
-	display: block;
+	display: flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: center;
+	flex-wrap: nowrap;
+	gap: var(--space-2);
 
-	padding: 0 1rem;
+	padding: 0.35rem 0.6rem;
 
 	background: rgb(7 8 10 / 0.82);
 	border: 1px solid rgb(255 255 255 / 0.12);
 	border-radius: var(--radius);
 
 	cursor: pointer;
-	color-scheme: dark;
 }
 
-.play-controller > select:hover,
-.play-controller > select:focus {
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-state="off"] {
+	opacity: 0.55;
+}
+
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-state="live"] {
 	border-color: var(--accent);
-	outline: none;
 }
 
-.play-stats {
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-active="true"] {
+	box-shadow: inset 0.2rem 0 0 var(--accent);
+}
+
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button:hover:not(:disabled),
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button:focus-visible {
+	border-color: var(--accent);
+}
+
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button:disabled {
+	cursor: not-allowed;
+}
+
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button > span:first-of-type {
+	min-width: 0;
+
+	text-overflow: ellipsis;
+	white-space: nowrap;
+
+	flex: 1 1 auto;
+
+	overflow: hidden;
+}
+
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button > span:last-of-type {
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+
+	text-transform: uppercase;
+
+	flex: 0 0 auto;
+}
+
+#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-state="live"] > span:last-of-type {
+	color: var(--accent);
+}
+
+#play > div:not(:has(> h2)) > div:last-child > p {
+	max-width: 22rem;
+
+	color: var(--muted);
+	font-size: var(--text-sm);
+	line-height: 1.45;
+
+	text-align: center;
+
+	margin: 0;
+}
+
+#play > dl {
 	font-family: var(--font-mono);
 	font-size: 0.7rem;
 	line-height: 1.35;
@@ -287,7 +332,7 @@
 	pointer-events: none;
 }
 
-.play-stats > div {
+#play > dl > div {
 	display: flex;
 	flex-direction: row;
 	justify-content: space-between;
@@ -296,11 +341,11 @@
 	gap: var(--space-4);
 }
 
-.play-stats dt {
+#play > dl dt {
 	color: var(--muted);
 }
 
-.play-settings {
+#play > aside {
 	width: min(22rem, 100%);
 
 	display: flex;
@@ -327,7 +372,7 @@
 	touch-action: auto;
 }
 
-.play-settings > div:first-child {
+#play > aside > div:first-child {
 	display: flex;
 	flex-direction: row;
 	justify-content: space-between;
@@ -336,13 +381,13 @@
 	gap: var(--space-3);
 }
 
-.play-settings > div:first-child > h2 {
+#play > aside > div:first-child > h2 {
 	font-size: var(--text-lg);
 	font-weight: 600;
 	letter-spacing: -0.03em;
 }
 
-.play-node {
+#play > aside .field > div {
 	min-width: 0;
 
 	display: flex;
@@ -353,7 +398,7 @@
 	gap: var(--space-3);
 }
 
-.play-node > p {
+#play > aside .field > div > p {
 	min-width: 0;
 
 	color: var(--text);
@@ -366,11 +411,11 @@
 	white-space: nowrap;
 }
 
-.play-node > .btn {
+#play > aside .field > div > .btn {
 	flex-shrink: 0;
 }
 
-.play-check {
+#play > aside > label:not(.field) {
 	color: var(--text);
 	font-size: var(--text-sm);
 	line-height: 1.35;
@@ -385,18 +430,25 @@
 	cursor: pointer;
 }
 
-.play-help > h3 {
+#play > aside > section {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
+	flex-wrap: nowrap;
+	gap: var(--space-3);
+}
+
+#play > aside > section > h3 {
 	color: var(--muted);
 	font-size: 0.7rem;
 	font-weight: 600;
 	letter-spacing: 0.08em;
 
 	text-transform: uppercase;
-
-	margin-bottom: var(--space-2);
 }
 
-.play-help > dl {
+#play > aside > section > dl {
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-start;
@@ -405,7 +457,7 @@
 	gap: 0.4rem;
 }
 
-.play-help > dl > div {
+#play > aside > section > dl > div {
 	display: flex;
 	flex-direction: row;
 	justify-content: space-between;
@@ -414,24 +466,19 @@
 	gap: var(--space-3);
 }
 
-.play-help dt {
+#play > aside > section dt {
 	font-family: var(--font-mono);
 	font-size: 0.7rem;
 }
 
-.play-help dd,
-.play-help > p {
+#play > aside > section dd,
+#play > aside > section > p {
 	color: var(--muted);
 	font-size: var(--text-sm);
-}
-
-.play-help > p {
 	line-height: 1.45;
-
-	margin-top: var(--space-3);
 }
 
-.play-toasts {
+#play > ul {
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-start;
@@ -450,7 +497,7 @@
 	pointer-events: none;
 }
 
-.play-toasts > li {
+#play > ul > li {
 	max-width: 28rem;
 
 	color: var(--text);
@@ -466,69 +513,60 @@
 }
 
 @media (max-width: 900px) {
-	.play-top {
+	#play > div:not(:has(> h2)) > div:first-child {
 		flex-direction: column;
 		justify-content: flex-start;
 		align-items: stretch;
 		gap: var(--space-3);
 	}
 
-	.play-slots,
-	.play-status {
+	#play > div:not(:has(> h2)) > div:first-child > div:last-child {
 		width: 100%;
-	}
-
-	.play-brand,
-	.play-status {
 		flex: none;
+		justify-content: flex-start;
 	}
 
-	.play-status {
-		justify-content: flex-start;
+	#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) {
+		align-self: flex-start;
+	}
+
+	#play > div:not(:has(> h2)) > div:first-child > .brand {
+		flex: none;
 	}
 }
 
 @media (max-width: 640px) {
-	.play-hud {
+	#play > div:not(:has(> h2)) {
 		padding: var(--space-3);
 		padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
 	}
 
-	.play-brand {
+	#play > div:not(:has(> h2)) > div:first-child > .brand {
 		display: none;
 	}
 
-	.play-slot {
-		height: 2.5rem;
-		min-width: 2.75rem;
-		flex: 1 1 auto;
-		justify-content: center;
+	#play > div:not(:has(> h2)) > div:last-child {
+		padding-inline: 0;
 	}
 
-	.play-bottom {
-		flex-direction: column-reverse;
-		align-items: stretch;
-	}
-
-	.play-controller > select {
+	#play > div:not(:has(> h2)) > div:last-child > div:first-child {
 		width: 100%;
-		min-width: 0;
 		max-width: none;
 	}
 
-	.play-tools {
+	#play > div:not(:has(> h2)) > div:last-child > div:last-child {
 		position: static;
 		align-self: flex-end;
 	}
 
-	.play-tools > .btn-icon {
+	#play > div:not(:has(> h2)) > div:last-child > div:last-child > .btn-icon {
 		width: 2.5rem;
 		height: 2.5rem;
 		min-width: 2.5rem;
 		min-height: 2.5rem;
 	}
 
-	.play-settings {
+	#play > aside {
 		width: 100%;
 
 		padding: var(--space-4);
@@ -537,26 +575,26 @@
 		border-left: 0;
 	}
 
-	.play-help > dl > div {
+	#play > aside > section > dl > div {
 		flex-direction: column;
 		gap: 0.15rem;
 	}
 
-	.play-stats {
+	#play > dl {
 		bottom: 7.5rem;
 		left: var(--space-3);
 	}
 
-	.play-toasts {
+	#play > ul {
 		bottom: 7.5rem;
 		padding: 0 var(--space-3);
 	}
 
-	.play-node {
+	#play > aside .field > div {
 		flex-wrap: wrap;
 	}
 
-	.play-node > p {
+	#play > aside .field > div > p {
 		flex: 1 1 100%;
 
 		overflow: visible;

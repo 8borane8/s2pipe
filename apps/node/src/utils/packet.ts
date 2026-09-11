@@ -1,10 +1,16 @@
 import { PAD_COUNT, type PadState } from "@s2pipe/shared/types/pad";
 
 // Keep in sync with firmware/packet.h
-const PACKET_SIZE = 64;
 const PACKET_MAGIC = 0x5332;
 const PACKET_VERSION = 1;
 const PACKET_FLAG_WAKE = 0x10;
+const PACKET_PADS_OFF = 4;
+const PACKET_PAD_SIZE = 8;
+const PACKET_CRC_OFF = PACKET_PADS_OFF + PAD_COUNT * PACKET_PAD_SIZE;
+const PACKET_WAKE_SWITCH_OFF = PACKET_CRC_OFF + 2;
+const PACKET_WAKE_PAD_OFF = PACKET_WAKE_SWITCH_OFF + 6;
+const PACKET_WAKE_PID_OFF = PACKET_WAKE_PAD_OFF + 6;
+const PACKET_SIZE = PACKET_WAKE_PID_OFF + 2;
 
 export type WakeAddrs = {
 	switchMac: Uint8Array;
@@ -31,7 +37,7 @@ export function encodePacket(pads: readonly PadState[], wake?: WakeAddrs | null)
 	view.setUint8(2, PACKET_VERSION);
 	view.setUint8(3, wake ? PACKET_FLAG_WAKE : 0);
 
-	let offset = 4;
+	let offset = PACKET_PADS_OFF;
 	for (let i = 0; i < PAD_COUNT; i++) {
 		const pad = pads[i]!;
 		view.setUint32(offset, pad.buttons, true);
@@ -39,14 +45,14 @@ export function encodePacket(pads: readonly PadState[], wake?: WakeAddrs | null)
 		packet[offset + 5] = pad.ly;
 		packet[offset + 6] = pad.rx;
 		packet[offset + 7] = pad.ry;
-		offset += 8;
+		offset += PACKET_PAD_SIZE;
 	}
 
-	view.setUint16(36, crc16ccitt(packet.subarray(0, 36)), true);
+	view.setUint16(PACKET_CRC_OFF, crc16ccitt(packet.subarray(0, PACKET_CRC_OFF)), true);
 	if (wake) {
-		packet.set(wake.switchMac, 38);
-		packet.set(wake.padMac, 44);
-		view.setUint16(50, wake.pid, true);
+		packet.set(wake.switchMac, PACKET_WAKE_SWITCH_OFF);
+		packet.set(wake.padMac, PACKET_WAKE_PAD_OFF);
+		view.setUint16(PACKET_WAKE_PID_OFF, wake.pid, true);
 	}
 	return packet;
 }

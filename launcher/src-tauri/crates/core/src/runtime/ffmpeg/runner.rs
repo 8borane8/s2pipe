@@ -1,16 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
-use crate::utils::paths::logs_dir;
-use crate::utils::process::{kill_pid, pid_alive};
+use crate::utils::process::{kill_pid, pid_alive, with_log_tail};
 
 /// FFmpeg rejects a bad device or encoder within a few hundred milliseconds, so
 /// a process still alive after this is considered good.
 const STABLE_AFTER: Duration = Duration::from_millis(1500);
-
-pub fn log_path(name: &str) -> Result<PathBuf, String> {
-    Ok(logs_dir()?.join(format!("{name}.log")))
-}
 
 /// Spawns each attempt in order and keeps the first one that survives.
 pub async fn run<T: Copy>(
@@ -57,12 +52,5 @@ async fn wait_alive(pid: u32) -> bool {
 }
 
 fn exit_error(label: &str, log: &Path) -> String {
-    let text = std::fs::read_to_string(log).unwrap_or_default();
-    let lines: Vec<&str> = text.lines().collect();
-    let tail = lines[lines.len().saturating_sub(30)..].join("\n");
-    if tail.is_empty() {
-        format!("{label} exited immediately. See {}", log.display())
-    } else {
-        format!("{label} exited immediately:\n{tail}")
-    }
+    with_log_tail(format!("{label} exited immediately"), log)
 }

@@ -728,3 +728,23 @@ fieldset.advanced > section > h2 {
 	cursor: default;
 	opacity: 0.4;
 }
+
+.actions .start.starting {
+	cursor: wait;
+	pointer-events: none;
+	transition: none;
+	animation: start-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes start-pulse {
+	0%,
+	100% {
+		opacity: 1;
+		filter: brightness(1);
+	}
+
+	50% {
+		opacity: 0.45;
+		filter: brightness(0.8);
+	}
+}

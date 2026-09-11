@@ -1,10 +1,10 @@
 use crate::config::AppConfig;
 use crate::runtime::{apps, deno, ffmpeg, mediamtx};
-use crate::utils::paths::{app_directory, ensure_app_directory};
-use crate::utils::process::{kill_pid, pid_alive};
+use crate::utils::paths::{app_directory, ensure_app_directory, log_path};
+use crate::utils::process::{kill_pid, pid_alive, with_log_tail};
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -79,7 +79,7 @@ impl Stack {
         let started = async {
             let mediamtx_pid = mediamtx::start()?;
             pids.mediamtx = Some(mediamtx_pid);
-            wait_for_port(8554, "MediaMTX", mediamtx_pid).await?;
+            wait_for_port(8554, "MediaMTX", mediamtx_pid, &log_path("mediamtx")?).await?;
 
             pids.ffmpeg = Some(ffmpeg::start_video(&config).await?);
 
@@ -93,8 +93,8 @@ impl Stack {
             pids.client = Some(client_pid);
 
             save_pids(&pids)?;
-            wait_for_port(node_port, "Node", node_pid).await?;
-            wait_for_port(client_port, "Client", client_pid).await?;
+            wait_for_port(node_port, "Node", node_pid, &log_path("node")?).await?;
+            wait_for_port(client_port, "Client", client_pid, &log_path("client")?).await?;
             Ok::<(), String>(())
         }
         .await;
@@ -136,11 +136,14 @@ fn parse_port(value: &str, name: &str) -> Result<u16, String> {
     Ok(port)
 }
 
-async fn wait_for_port(port: u16, name: &str, pid: u32) -> Result<(), String> {
+async fn wait_for_port(port: u16, name: &str, pid: u32, log: &Path) -> Result<(), String> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     loop {
         if !pid_alive(pid) {
-            return Err(format!("{name} exited before opening :{port}"));
+            return Err(with_log_tail(
+                format!("{name} exited before opening :{port}"),
+                log,
+            ));
         }
         if tokio::net::TcpStream::connect(("127.0.0.1", port))
             .await
@@ -149,7 +152,7 @@ async fn wait_for_port(port: u16, name: &str, pid: u32) -> Result<(), String> {
             return Ok(());
         }
         if std::time::Instant::now() >= deadline {
-            return Err(format!("{name} did not open :{port}"));
+            return Err(with_log_tail(format!("{name} did not open :{port}"), log));
         }
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }

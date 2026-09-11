@@ -61,7 +61,7 @@ function Toasters({ toasters }: { toasters: Toaster[] }) {
 	return (
 		<div id="toasters">
 			{toasters.map((toaster) => (
-				<div key={toaster.id} class={toaster.type}>
+				<div key={toaster.id} className={toaster.type}>
 					<p>{toaster.message}</p>
 					{toaster.description && <small>{toaster.description}</small>}
 				</div>

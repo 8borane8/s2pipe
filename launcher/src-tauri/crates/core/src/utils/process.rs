@@ -2,34 +2,19 @@ use std::fs::File;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-pub fn spawn_detached(command: Command, label: &str) -> Result<u32, String> {
-    spawn(command, label, None)
-}
-
-pub fn spawn_logged(command: Command, label: &str, log: &Path) -> Result<u32, String> {
-    spawn(command, label, Some(log))
-}
-
-fn spawn(mut command: Command, label: &str, log: Option<&Path>) -> Result<u32, String> {
-    command.stdin(Stdio::null());
-    match log {
-        Some(path) => {
-            if let Some(dir) = path.parent() {
-                std::fs::create_dir_all(dir)
-                    .map_err(|e| format!("Failed to create log directory: {e}"))?;
-            }
-            let file = File::create(path)
-                .map_err(|e| format!("Failed to create log {}: {e}", path.display()))?;
-            let stderr = file
-                .try_clone()
-                .map_err(|e| format!("Failed to clone log handle: {e}"))?;
-            command.stdout(Stdio::from(file));
-            command.stderr(Stdio::from(stderr));
-        }
-        None => {
-            command.stdout(Stdio::null()).stderr(Stdio::null());
-        }
+pub fn spawn_logged(mut command: Command, label: &str, log: &Path) -> Result<u32, String> {
+    if let Some(dir) = log.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create log directory: {e}"))?;
     }
+    let file =
+        File::create(log).map_err(|e| format!("Failed to create log {}: {e}", log.display()))?;
+    let stderr = file
+        .try_clone()
+        .map_err(|e| format!("Failed to clone log handle: {e}"))?;
+
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::from(file));
+    command.stderr(Stdio::from(stderr));
 
     #[cfg(unix)]
     {
@@ -57,6 +42,21 @@ fn spawn(mut command: Command, label: &str, log: Option<&Path>) -> Result<u32, S
     {
         let _ = (command, label);
         Err("Unsupported operating system".into())
+    }
+}
+
+pub fn log_tail(path: &Path, n: usize) -> String {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let lines: Vec<&str> = text.lines().collect();
+    lines[lines.len().saturating_sub(n)..].join("\n")
+}
+
+pub fn with_log_tail(message: String, log: &Path) -> String {
+    let tail = log_tail(log, 30);
+    if tail.is_empty() {
+        format!("{message}. See {}", log.display())
+    } else {
+        format!("{message}:\n{tail}")
     }
 }
 
