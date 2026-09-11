@@ -1,51 +1,161 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-pub fn spawn_logged(mut command: Command, label: &str, log: &Path) -> Result<u32, String> {
+pub struct Ffmpeg {
+    pub child: Child,
+    out_time_us: Arc<AtomicI64>,
+}
+
+impl Ffmpeg {
+    pub fn kill(mut self) {
+        kill_child(&mut self.child);
+    }
+
+    pub fn alive(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+
+    pub fn out_time_us(&self) -> i64 {
+        self.out_time_us.load(Ordering::Relaxed)
+    }
+
+    pub async fn wait_output(&mut self, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if !self.alive() {
+                return false;
+            }
+            if self.out_time_us() > 0 {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+}
+
+pub(crate) fn kill_child(child: &mut Child) {
+    kill_pid_force(child.id());
+    let _ = child.wait();
+}
+
+fn create_log(log: &Path, append: bool) -> Result<File, String> {
     if let Some(dir) = log.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create log directory: {e}"))?;
     }
-    let file =
-        File::create(log).map_err(|e| format!("Failed to create log {}: {e}", log.display()))?;
-    let stderr = file
-        .try_clone()
-        .map_err(|e| format!("Failed to clone log handle: {e}"))?;
+    let mut options = OpenOptions::new();
+    options.create(true);
+    if append {
+        options.append(true);
+    } else {
+        options.write(true).truncate(true);
+    }
+    options
+        .open(log)
+        .map_err(|e| format!("Failed to create log {}: {e}", log.display()))
+}
 
-    command.stdin(Stdio::null());
-    command.stdout(Stdio::from(file));
-    command.stderr(Stdio::from(stderr));
-
+fn detach(command: &mut Command) {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
-        return command
-            .spawn()
-            .map(|child| child.id())
-            .map_err(|e| format!("Failed to start {label}: {e}"));
     }
 
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-        command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
-        command
-            .spawn()
-            .map(|child| child.id())
-            .map_err(|e| format!("Failed to start {label}: {e}"))
-    }
-
-    #[cfg(not(any(windows, unix)))]
-    {
-        let _ = (command, label);
-        Err("Unsupported operating system".into())
+        command.creation_flags(0x0800_0000 | 0x0000_0200);
     }
 }
 
-pub fn log_tail(path: &Path, n: usize) -> String {
+fn spawn(command: &mut Command, label: &str) -> Result<Child, String> {
+    command
+        .spawn()
+        .map_err(|e| format!("Failed to start {label}: {e}"))
+}
+
+fn abandon<T>(mut child: Child, message: String) -> Result<T, String> {
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(message)
+}
+
+pub fn spawn_logged(mut command: Command, label: &str, log: &Path) -> Result<u32, String> {
+    let file = create_log(log, false)?;
+    let stderr = file
+        .try_clone()
+        .map_err(|e| format!("Failed to clone log handle: {e}"))?;
+
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(file))
+        .stderr(Stdio::from(stderr));
+    detach(&mut command);
+    spawn(&mut command, label).map(|child| child.id())
+}
+
+pub fn spawn_ffmpeg(mut command: Command, label: &str, log: &Path) -> Result<Ffmpeg, String> {
+    // `-progress pipe:2`: stdout is buffered on Windows and never delivers
+    // `out_time_us=`. stderr is not.
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let mut child = spawn(&mut command, label)?;
+    let Some(stderr) = child.stderr.take() else {
+        return abandon(child, format!("Failed to open {label} progress pipe"));
+    };
+    let out_time_us = Arc::new(AtomicI64::new(0));
+    let clock = out_time_us.clone();
+    let mut log = create_log(log, true)?;
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().flatten() {
+            if let Some(n) = line.strip_prefix("out_time_us=").and_then(|v| v.trim().parse().ok()) {
+                clock.store(n, Ordering::Relaxed);
+            } else if line.contains(' ') {
+                let _ = writeln!(log, "{line}");
+            }
+        }
+    });
+    Ok(Ffmpeg { child, out_time_us })
+}
+
+pub fn spawn_worker(
+    mut command: Command,
+    label: &str,
+    log: &Path,
+    input: &[u8],
+) -> Result<(Child, ChildStdout), String> {
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::from(create_log(log, false)?));
+    detach(&mut command);
+
+    let mut child = spawn(&mut command, label)?;
+    let Some(mut stdin) = child.stdin.take() else {
+        return abandon(child, format!("Failed to open {label} input pipe"));
+    };
+    if let Err(error) = stdin.write_all(input) {
+        return abandon(child, format!("Failed to configure {label}: {error}"));
+    }
+    drop(stdin);
+    let Some(stdout) = child.stdout.take() else {
+        return abandon(child, format!("Failed to open {label} output pipe"));
+    };
+
+    Ok((child, stdout))
+}
+
+fn log_tail(path: &Path, n: usize) -> String {
     let text = std::fs::read_to_string(path).unwrap_or_default();
     let lines: Vec<&str> = text.lines().collect();
     lines[lines.len().saturating_sub(n)..].join("\n")
@@ -74,14 +184,31 @@ pub fn kill_pid(pid: u32) {
     }
 
     #[cfg(unix)]
-    {
-        let _ = Command::new("kill")
-            .args(["-TERM", &format!("-{pid}")])
-            .status();
-        let _ = Command::new("kill")
-            .args(["-TERM", &pid.to_string()])
-            .status();
-    }
+    unix_kill(pid, "-TERM");
+}
+
+pub fn kill_pid_force(pid: u32) {
+    #[cfg(windows)]
+    kill_pid(pid);
+
+    #[cfg(unix)]
+    unix_kill(pid, "-KILL");
+}
+
+#[cfg(unix)]
+fn unix_kill(pid: u32, signal: &str) {
+    let _ = Command::new("kill")
+        .args([signal, &format!("-{pid}")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    let _ = Command::new("kill")
+        .args([signal, &pid.to_string()])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }
 
 pub fn pid_alive(pid: u32) -> bool {

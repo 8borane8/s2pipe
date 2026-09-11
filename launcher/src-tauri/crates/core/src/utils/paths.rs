@@ -10,6 +10,15 @@ pub fn bins_dir() -> Result<PathBuf, String> {
     Ok(app_directory()?.join("bins"))
 }
 
+/// Last GUI or CLI that was launched. Watchdog and autostart always use this.
+pub fn launcher_path() -> Result<PathBuf, String> {
+    Ok(app_directory()?.join(if cfg!(windows) {
+        "launcher.exe"
+    } else {
+        "launcher"
+    }))
+}
+
 pub fn log_path(name: &str) -> Result<PathBuf, String> {
     Ok(app_directory()?.join("logs").join(format!("{name}.log")))
 }

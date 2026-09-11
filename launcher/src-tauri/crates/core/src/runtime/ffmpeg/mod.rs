@@ -1,20 +1,22 @@
 mod encoder;
 mod input;
-mod runner;
+mod watchdog;
 
+use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 
 use crate::config::AppConfig;
 use crate::utils::bin::{bin_path, ensure_downloaded};
 use crate::utils::paths::log_path;
-use crate::utils::process::spawn_logged;
+use crate::utils::process::{spawn_ffmpeg, with_log_tail, Ffmpeg};
 
-use encoder::Backend;
-use runner::run;
+pub(crate) use watchdog::run as run_watchdog;
 
 const FFMPEG_VERSION: &str = "9.0";
 const RTSP_VIDEO: &str = "rtsp://127.0.0.1:8554/switch";
 const RTSP_AUDIO: &str = "rtsp://127.0.0.1:8554/switch-audio";
+const FIRST_OUTPUT: Duration = Duration::from_secs(8);
 
 pub async fn ensure() -> Result<(), String> {
     let (url, archive) = if cfg!(target_os = "windows") {
@@ -42,65 +44,76 @@ pub async fn ensure() -> Result<(), String> {
         .map(|_| ())
 }
 
-pub fn should_start_audio(config: &AppConfig) -> bool {
+fn should_start_audio(config: &AppConfig) -> bool {
     input::is_test(config) || !config.capture_audio.trim().is_empty()
 }
 
-#[derive(Clone, Copy)]
-struct VideoAttempt {
-    backend: Backend,
-    loose: bool,
-}
-
-pub async fn start_video(config: &AppConfig) -> Result<u32, String> {
+async fn start_video(config: &AppConfig) -> Result<Ffmpeg, String> {
     let log = log_path("ffmpeg-video")?;
     let backends = encoder::backends(config);
-
-    // Strict first on every backend: a missing GPU and a capture card that
-    // refuses the requested mode look the same until FFmpeg exits.
-    let mut attempts: Vec<VideoAttempt> = backends
-        .iter()
-        .map(|&backend| VideoAttempt {
-            backend,
-            loose: false,
-        })
-        .collect();
-
+    let mut attempts = Vec::new();
+    for &backend in &backends {
+        attempts.push((backend, false));
+    }
     if !input::is_test(config) {
-        attempts.extend(backends.iter().map(|&backend| VideoAttempt {
-            backend,
-            loose: true,
-        }));
+        for &backend in &backends {
+            attempts.push((backend, true));
+        }
     }
 
-    run("FFmpeg video", &log, &attempts, |attempt| {
+    first_output("FFmpeg video", &log, &attempts, |&(backend, loose)| {
         let mut command = ffmpeg_command()?;
-        input::video(&mut command, config, attempt.loose)?;
-        encoder::video(&mut command, config, attempt.backend);
+        input::video(&mut command, config, loose)?;
+        encoder::video(&mut command, config, backend);
         rtsp_output(&mut command, RTSP_VIDEO);
-        spawn_logged(command, "FFmpeg video", &log)
+        spawn_ffmpeg(command, "FFmpeg video", &log)
     })
     .await
 }
 
-pub async fn start_audio(config: &AppConfig) -> Result<u32, String> {
+async fn start_audio(config: &AppConfig) -> Result<Ffmpeg, String> {
     let log = log_path("ffmpeg-audio")?;
-    // DirectShow's default capture buffer is hundreds of milliseconds. A short
-    // one may be refused, so Windows retries without it. ALSA has no such knob.
     let attempts = if cfg!(target_os = "windows") && !input::is_test(config) {
         vec![true, false]
     } else {
         vec![false]
     };
 
-    run("FFmpeg audio", &log, &attempts, |small_buffer| {
+    first_output("FFmpeg audio", &log, &attempts, |&small_buffer| {
         let mut command = ffmpeg_command()?;
         input::audio(&mut command, config, small_buffer)?;
         encoder::audio(&mut command);
         rtsp_output(&mut command, RTSP_AUDIO);
-        spawn_logged(command, "FFmpeg audio", &log)
+        spawn_ffmpeg(command, "FFmpeg audio", &log)
     })
     .await
+}
+
+async fn first_output<T>(
+    label: &str,
+    log: &Path,
+    attempts: &[T],
+    mut spawn: impl FnMut(&T) -> Result<Ffmpeg, String>,
+) -> Result<Ffmpeg, String> {
+    let mut spawn_error = None;
+    let mut started = false;
+    for attempt in attempts {
+        match spawn(attempt) {
+            Ok(mut ffmpeg) => {
+                started = true;
+                if ffmpeg.wait_output(FIRST_OUTPUT).await {
+                    return Ok(ffmpeg);
+                }
+                ffmpeg.kill();
+            }
+            Err(error) => spawn_error = Some(error),
+        }
+    }
+    if started {
+        Err(with_log_tail(format!("{label} produced no output"), log))
+    } else {
+        Err(spawn_error.unwrap_or_else(|| format!("{label} could not be started")))
+    }
 }
 
 fn ffmpeg_command() -> Result<Command, String> {
@@ -109,7 +122,14 @@ fn ffmpeg_command() -> Result<Command, String> {
         return Err(format!("FFmpeg binary not found: {}", path.display()));
     }
     let mut command = Command::new(path);
-    command.args(["-hide_banner", "-nostats", "-loglevel", "warning"]);
+    command.args([
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "warning",
+        "-progress",
+        "pipe:2",
+    ]);
     Ok(command)
 }
 

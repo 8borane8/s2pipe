@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use s2pipe_core::{load_config, AppConfig, Stack};
+use s2pipe_core::{has_arg, install_launcher, load_config, run_watchdog, AppConfig, Stack};
 
 #[derive(Parser)]
 #[command(
@@ -116,17 +116,29 @@ impl StartArgs {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    let cli = Cli::parse();
-    if let Err(error) = run(cli).await {
+fn main() {
+    if has_arg("--watchdog") {
+        run_watchdog();
+        return;
+    }
+
+    let _ = install_launcher();
+    if let Err(error) = run() {
         eprintln!("error: {error}");
         std::process::exit(1);
     }
 }
 
-async fn run(cli: Cli) -> Result<(), String> {
-    match cli.command {
+#[tokio::main]
+async fn run() -> Result<(), String> {
+    if has_arg("--autostart") {
+        return match load_config()? {
+            Some(config) if config.launch_at_startup => Stack::start(config).await,
+            _ => Ok(()),
+        };
+    }
+
+    match Cli::parse().command {
         Command::Start(args) => {
             let config = args.merge(load_config()?.unwrap_or_default());
             println!("Starting s2pipe...");

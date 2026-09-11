@@ -1,17 +1,19 @@
 use crate::config::AppConfig;
 use crate::runtime::{apps, deno, ffmpeg, mediamtx};
+use crate::utils::bin::install_launcher;
 use crate::utils::paths::{app_directory, ensure_app_directory, log_path};
-use crate::utils::process::{kill_pid, pid_alive, with_log_tail};
+use crate::utils::process::{kill_pid, kill_pid_force, pid_alive, spawn_worker, with_log_tail};
 
 use serde::{Deserialize, Serialize};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
 struct StackPids {
+    ffmpeg_watchdog: Option<u32>,
     mediamtx: Option<u32>,
-    ffmpeg: Option<u32>,
-    ffmpeg_audio: Option<u32>,
     node: Option<u32>,
     client: Option<u32>,
 }
@@ -19,10 +21,9 @@ struct StackPids {
 impl StackPids {
     fn pids(&self) -> impl Iterator<Item = u32> {
         [
+            self.ffmpeg_watchdog,
             self.client,
             self.node,
-            self.ffmpeg,
-            self.ffmpeg_audio,
             self.mediamtx,
         ]
         .into_iter()
@@ -34,8 +35,13 @@ impl StackPids {
     }
 
     fn kill_all(&self) {
+        if let Some(pid) = self.ffmpeg_watchdog {
+            kill_pid_force(pid);
+        }
         for pid in self.pids() {
-            kill_pid(pid);
+            if Some(pid) != self.ffmpeg_watchdog {
+                kill_pid(pid);
+            }
         }
     }
 }
@@ -69,6 +75,7 @@ impl Stack {
         ensure_app_directory()?;
         let _ = Self::stop();
 
+        let watchdog_bin = install_launcher()?;
         let workspace = apps::ensure()?;
         ffmpeg::ensure().await?;
         mediamtx::ensure().await?;
@@ -77,22 +84,24 @@ impl Stack {
 
         let mut pids = StackPids::default();
         let started = async {
+            // Each pid is written as soon as it exists: a launcher killed
+            // mid-start otherwise leaves orphans that hold :8554 and :8000,
+            // and the next start fails on a port that nothing owns anymore.
             let mediamtx_pid = mediamtx::start()?;
             pids.mediamtx = Some(mediamtx_pid);
+            save_pids(&pids)?;
             wait_for_port(8554, "MediaMTX", mediamtx_pid, &log_path("mediamtx")?).await?;
 
-            pids.ffmpeg = Some(ffmpeg::start_video(&config).await?);
-
-            if ffmpeg::should_start_audio(&config) {
-                pids.ffmpeg_audio = Some(ffmpeg::start_audio(&config).await?);
-            }
+            pids.ffmpeg_watchdog = Some(start_ffmpeg_watchdog(&watchdog_bin, &config).await?);
+            save_pids(&pids)?;
 
             let node_pid = deno::start_node(&deno_bin, &workspace, &config)?;
             pids.node = Some(node_pid);
+            save_pids(&pids)?;
             let client_pid = deno::start_client(&deno_bin, &workspace, &config)?;
             pids.client = Some(client_pid);
-
             save_pids(&pids)?;
+
             wait_for_port(node_port, "Node", node_pid, &log_path("node")?).await?;
             wait_for_port(client_port, "Client", client_pid, &log_path("client")?).await?;
             Ok::<(), String>(())
@@ -107,6 +116,31 @@ impl Stack {
 
         Ok(())
     }
+}
+
+async fn start_ffmpeg_watchdog(binary: &Path, config: &AppConfig) -> Result<u32, String> {
+    let json =
+        serde_json::to_vec(config).map_err(|e| format!("Failed to encode watchdog config: {e}"))?;
+    let log = log_path("ffmpeg-watchdog")?;
+    let mut command = Command::new(binary);
+    command.arg("--watchdog");
+    let (mut child, stdout) = spawn_worker(command, "FFmpeg watchdog", &log, &json)?;
+    let pid = child.id();
+    let ready = tokio::task::spawn_blocking(move || {
+        let mut line = String::new();
+        BufReader::new(stdout).read_line(&mut line).map(|_| line)
+    });
+
+    let error = match tokio::time::timeout(std::time::Duration::from_secs(60), ready).await {
+        Ok(Ok(Ok(line))) if line.trim() == "READY" => return Ok(pid),
+        Ok(Ok(Ok(_))) => "FFmpeg watchdog exited before becoming ready".into(),
+        Ok(Ok(Err(error))) => format!("Failed to read FFmpeg watchdog status: {error}"),
+        Ok(Err(error)) => format!("FFmpeg watchdog status task failed: {error}"),
+        Err(_) => "FFmpeg watchdog did not become ready".into(),
+    };
+    kill_pid_force(pid);
+    let _ = child.wait();
+    Err(with_log_tail(error, &log))
 }
 
 fn pids_path() -> Result<PathBuf, String> {

@@ -1,6 +1,6 @@
 mod commands;
 
-use s2pipe_core::{load_config, Stack};
+use s2pipe_core::{has_arg, install_launcher, load_config, run_watchdog, set_autostart, Stack};
 use tauri::{Emitter, Manager};
 
 fn show_window(app: &tauri::AppHandle) {
@@ -12,17 +12,20 @@ fn show_window(app: &tauri::AppHandle) {
 }
 
 pub fn run() {
+    if has_arg("--watchdog") {
+        run_watchdog();
+        return;
+    }
+
+    let _ = install_launcher();
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--autostart"]),
-        ))
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_window(app);
         }))
         .setup(|app| {
             let handle = app.handle().clone();
-            let launched_at_startup = std::env::args().any(|arg| arg == "--autostart");
+            let launched_at_startup = has_arg("--autostart");
 
             let config = match load_config() {
                 Ok(config) => config,
@@ -33,19 +36,27 @@ pub fn run() {
             };
 
             if launched_at_startup {
-                if let Some(config) = config {
-                    let start_handle = handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        match Stack::start(config).await {
-                            Ok(()) => start_handle.exit(0),
-                            Err(error) => {
-                                eprintln!("Failed to auto-start s2pipe: {error}");
-                                show_window(&start_handle);
-                                let _ = start_handle.emit("stack-status", format!("error:{error}"));
+                match config {
+                    Some(config) if config.launch_at_startup => {
+                        let start_handle = handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            match Stack::start(config).await {
+                                Ok(()) => start_handle.exit(0),
+                                Err(error) => {
+                                    eprintln!("Failed to auto-start s2pipe: {error}");
+                                    show_window(&start_handle);
+                                    let _ =
+                                        start_handle.emit("stack-status", format!("error:{error}"));
+                                }
                             }
-                        }
-                    });
-                    return Ok(());
+                        });
+                        return Ok(());
+                    }
+                    _ => {
+                        let _ = set_autostart(false);
+                        app.handle().exit(0);
+                        return Ok(());
+                    }
                 }
             }
 

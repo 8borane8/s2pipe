@@ -31,5 +31,5 @@ No VCC. UART1, **921600 8N1**. Adapter RX/TX LEDs show traffic.
 One native USB: flash from the PC, then plug the Pico into the dock. Not a COM port and pads at the same time.
 
 Sleep wake (Pico 2 W / Pico W): use **Listen for controller** in the s2pipe launcher. The on-board LED stays on while
-the firmware is running and goes dark for a second each time a wake advert fires. Non-W boards compile; wake is a
-no-op. Full power-off still needs the console button. Switch 1 pads cannot wake a Switch 2.
+the firmware is running and goes dark for a second each time a wake advert fires. Non-W boards compile; wake is a no-op.
+Full power-off still needs the console button. Switch 1 pads cannot wake a Switch 2.
