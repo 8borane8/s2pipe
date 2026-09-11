@@ -134,7 +134,7 @@ that console. The console does **not** show its BT MAC in settings; the pad broa
 If the scan finds no Switch MAC, the pad was not advertising the console address. Sleep the Switch, detach the pad,
 stand closer, retry.
 
-The Pico LED stays on, and blinks only while the wake advert is on air.
+The Pico LED stays on, and goes dark for a second each time a wake advert fires.
 
 ## Ports
 
