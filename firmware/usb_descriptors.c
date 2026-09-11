@@ -7,11 +7,12 @@
 #define TUD_HID_INOUT_DESC_LEN (9 + 9 + 7 + 7)
 #endif
 
-/* Eight HORI Pokkén HIDs (VID 0x0F0D / PID 0x0092, same report as GP2040-CE). */
+/* Eight HORI Pokkén HIDs (VID 0x0F0D / PID 0x0092, same report as GP2040-CE).
+   IN+OUT like the real pad and the 4-pad firmware that the Switch accepted. */
 
-#define HID_PAD(_n, _str, _epout, _epin) \
+#define HID_PAD(_n, _epout, _epin) \
 	TUD_HID_INOUT_DESCRIPTOR( \
-		_n, _str, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), \
+		_n, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), \
 		_epout, _epin, CFG_TUD_HID_EP_BUFSIZE, 1 \
 	)
 
@@ -36,31 +37,34 @@ _Static_assert(sizeof(desc_hid_report) == 86, "GP2040 / LUFA Pokken report descr
 
 static uint8_t const desc_configuration[] = {
 	TUD_CONFIG_DESCRIPTOR(1, PAD_COUNT, 0, CONFIG_LEN, 0x80, 500),
-	HID_PAD(0, 3, 0x01, 0x81),
-	HID_PAD(1, 4, 0x02, 0x82),
-	HID_PAD(2, 5, 0x03, 0x83),
-	HID_PAD(3, 6, 0x04, 0x84),
-	HID_PAD(4, 7, 0x05, 0x85),
-	HID_PAD(5, 8, 0x06, 0x86),
-	HID_PAD(6, 9, 0x07, 0x87),
-	HID_PAD(7, 10, 0x08, 0x88),
+	HID_PAD(0, 0x01, 0x81),
+	HID_PAD(1, 0x02, 0x82),
+	HID_PAD(2, 0x03, 0x83),
+	HID_PAD(3, 0x04, 0x84),
+	HID_PAD(4, 0x05, 0x85),
+	HID_PAD(5, 0x06, 0x86),
+	HID_PAD(6, 0x07, 0x87),
+	HID_PAD(7, 0x08, 0x88),
 };
 
 _Static_assert(sizeof(desc_configuration) == 265, "eight Pokken IN+OUT interfaces = 265-byte config");
 _Static_assert(PAD_COUNT == 8, "usb_descriptors lists eight HID pads");
 
+/* All 16 endpoints poll at 1 ms, so the host must fit them in a single full-speed frame: 12000 bit
+   times, of which only 90% is reservable for periodic transfers. One transaction costs 13 bytes of
+   protocol overhead plus the payload, inflated by worst-case bit stuffing, plus turnaround. Ask for
+   more and the host refuses the configuration outright instead of enumerating the device. */
+#define EP_BIT_TIMES(_bytes) (((((_bytes) + 13) * 8 * 7) / 6) + 100)
+
+_Static_assert(
+	(PAD_COUNT * 2) * EP_BIT_TIMES(CFG_TUD_HID_EP_BUFSIZE) <= 10800,
+	"1 ms endpoints exceed the full-speed periodic bandwidth budget"
+);
+
 char const *string_desc_arr[] = {
 	(const char[]){ 0x09, 0x04 },
 	"HORI CO.,LTD.",
 	"POKKEN CONTROLLER",
-	"P1",
-	"P2",
-	"P3",
-	"P4",
-	"P5",
-	"P6",
-	"P7",
-	"P8",
 };
 
 static uint16_t _desc_str[32];

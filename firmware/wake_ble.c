@@ -12,7 +12,7 @@
 
 #define ADV_MS 2500
 #define ADDR_TIMEOUT_MS 800
-#define LED_BLINK_MS 125
+#define LED_OFF_MS 1000
 #define PID_DEFAULT 0x2069
 
 static const hci_cmd_t hci_bcm_write_bd_addr = { 0xfc01, "B" };
@@ -43,21 +43,12 @@ static bool advertising;
 static bool led_on;
 static uint32_t adv_until_ms;
 static uint32_t write_until_ms;
-static uint32_t led_until_ms;
+static uint32_t led_on_at_ms;
 
 static void led(bool on) {
+	if (led_on == on) return;
 	led_on = on;
 	cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, on);
-}
-
-static void led_tick(uint32_t now) {
-	if (!advertising) {
-		if (!led_on) led(true);
-		return;
-	}
-	if (now < led_until_ms) return;
-	led_until_ms = now + LED_BLINK_MS;
-	led(!led_on);
 }
 
 static void reverse_mac(uint8_t const in[6], uint8_t out[6]) {
@@ -77,8 +68,11 @@ static void start_adv(void) {
 	gap_advertisements_set_params(0x20, 0x40, 0x00, 0, none_addr, 0x07, 0x00);
 	gap_advertisements_enable(1);
 	advertising = true;
-	adv_until_ms = to_ms_since_boot(get_absolute_time()) + ADV_MS;
-	led_until_ms = 0;
+
+	uint32_t now = to_ms_since_boot(get_absolute_time());
+	adv_until_ms = now + ADV_MS;
+	led(false);
+	led_on_at_ms = now + LED_OFF_MS;
 }
 
 static void on_hci(uint8_t type, uint16_t channel, uint8_t *packet, uint16_t size) {
@@ -152,10 +146,9 @@ void wake_ble_poll(void) {
 	if (advertising && now >= adv_until_ms) {
 		gap_advertisements_enable(0);
 		advertising = false;
-		led(true);
 	}
 
-	led_tick(now);
+	if (now >= led_on_at_ms) led(true);
 }
 
 #else
