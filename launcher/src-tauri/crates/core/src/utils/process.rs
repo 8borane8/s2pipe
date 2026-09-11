@@ -109,6 +109,7 @@ pub fn spawn_ffmpeg(mut command: Command, label: &str, log: &Path) -> Result<Ffm
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
+    detach(&mut command);
     let mut child = spawn(&mut command, label)?;
     let Some(stderr) = child.stderr.take() else {
         return abandon(child, format!("Failed to open {label} progress pipe"));
