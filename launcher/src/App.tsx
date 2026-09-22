@@ -200,19 +200,27 @@ function App() {
 	/* ---------------------------------------------------------------------- */
 
 	function updateConfig<K extends keyof AppConfig>(key: K, value: AppConfig[K]) {
-		setConfig((current) => ({
-			...current,
-			[key]: value,
-		}));
+		setConfig((current) => {
+			const next = {
+				...current,
+				[key]: value,
+			};
+			void persistConfig(next);
+			return next;
+		});
 	}
 
 	function applyHost(exposure: string, ip: string) {
-		setConfig((current) => ({
-			...current,
-			exposure,
-			nodeBaseUrl: nodeAddress(ip, current.nodePort),
-			mediaIceIp: ip,
-		}));
+		setConfig((current) => {
+			const next = {
+				...current,
+				exposure,
+				nodeBaseUrl: nodeAddress(ip, current.nodePort),
+				mediaIceIp: ip,
+			};
+			void persistConfig(next);
+			return next;
+		});
 	}
 
 	function updateNodePort(port: string) {
@@ -223,11 +231,13 @@ function App() {
 				current.nodePort,
 			);
 
-			return {
+			const next = {
 				...current,
 				nodePort: port,
 				nodeBaseUrl: generated ? nodeAddress(current.mediaIceIp, port) : current.nodeBaseUrl,
 			};
+			void persistConfig(next);
+			return next;
 		});
 	}
 
@@ -241,7 +251,11 @@ function App() {
 			const ip = await invoke<string>(value === "lan" ? "local_ip" : "public_ip");
 			applyHost(value, ip);
 		} catch (error) {
-			setConfig((current) => ({ ...current, exposure: value }));
+			setConfig((current) => {
+				const next = { ...current, exposure: value };
+				void persistConfig(next);
+				return next;
+			});
 			showError(
 				value === "lan" ? "Could not detect the LAN IP." : "Could not detect the public IP.",
 				{ description: getErrorMessage(error) },
@@ -336,7 +350,11 @@ function App() {
 					(device) => device.path === config.captureDevice,
 				)
 			) {
-				updateConfig("captureDevice", devices[0].path);
+				// UI-only fallback: do not overwrite the saved CLI/GUI preference.
+				setConfig((current) => ({
+					...current,
+					captureDevice: devices[0].path,
+				}));
 			}
 
 			if (!silent && devices.length === 0 && config.captureSource !== "test") {
@@ -366,7 +384,11 @@ function App() {
 					(device) => device.path === config.captureAudio,
 				)
 			) {
-				updateConfig("captureAudio", devices[0].path);
+				// UI-only fallback: do not overwrite the saved CLI/GUI preference.
+				setConfig((current) => ({
+					...current,
+					captureAudio: devices[0].path,
+				}));
 			}
 		} catch (error) {
 			console.error("list_audio_devices failed:", error);

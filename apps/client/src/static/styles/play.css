@@ -14,7 +14,7 @@
 	user-select: none;
 }
 
-#play[data-idle="true"] > div:not(:has(> h2)) {
+#play[data-idle="true"] > #hud {
 	opacity: 0;
 	pointer-events: none;
 	transition: none;
@@ -71,7 +71,7 @@
 	line-height: 1.45;
 }
 
-#play > div:not(:has(> h2)) {
+#play > #hud {
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
@@ -95,8 +95,8 @@
 	pointer-events: none;
 }
 
-#play > div:not(:has(> h2)) > div:first-child,
-#play > div:not(:has(> h2)) > div:last-child > div:last-child {
+#play > #hud > div:first-child,
+#play > #hud > div:last-child > div:last-child {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
@@ -105,15 +105,15 @@
 	gap: var(--space-2);
 }
 
-#play > div:not(:has(> h2)) > div:first-child {
+#play > #hud > div:first-child {
 	justify-content: space-between;
 }
 
-#play > div:not(:has(> h2)) > div:first-child > .brand {
+#play > #hud > div:first-child > .brand {
 	flex: 1;
 }
 
-#play > div:not(:has(> h2)) > div:first-child > div:last-child {
+#play > #hud > div:first-child > div:last-child {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
@@ -123,7 +123,7 @@
 	gap: var(--space-2);
 }
 
-#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) {
+#play > #hud > div:first-child > span:nth-of-type(2) {
 	color: var(--muted);
 	font-size: 0.7rem;
 	font-weight: 600;
@@ -146,12 +146,12 @@
 	border-radius: 99px;
 }
 
-#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) > svg {
+#play > #hud > div:first-child > span:nth-of-type(2) > svg {
 	color: var(--accent);
 	flex-shrink: 0;
 }
 
-#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) > span {
+#play > #hud > div:first-child > span:nth-of-type(2) > span {
 	display: inline-flex;
 	flex-direction: row;
 	justify-content: flex-start;
@@ -160,13 +160,13 @@
 	gap: 2px;
 }
 
-#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) > span > strong {
+#play > #hud > div:first-child > span:nth-of-type(2) > span > strong {
 	color: var(--text);
 	font-size: var(--text-sm);
 	font-weight: 700;
 }
 
-#play > div:not(:has(> h2)) > div:last-child {
+#play > #hud > div:last-child {
 	display: flex;
 	flex-direction: column;
 	flex-wrap: nowrap;
@@ -179,7 +179,7 @@
 	position: relative;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:last-child {
+#play > #hud > div:last-child > div:last-child {
 	justify-content: flex-end;
 
 	position: absolute;
@@ -187,25 +187,25 @@
 	bottom: 0;
 }
 
-#play > div:not(:has(> h2)) > div:first-child > div:last-child,
-#play > div:not(:has(> h2)) > div:last-child > div:first-child,
-#play > div:not(:has(> h2)) > div:last-child > div:last-child,
-#play > div:not(:has(> h2)) .btn {
+#play > #hud > div:first-child > div:last-child,
+#play > #hud .pad-list,
+#play > #hud > div:last-child > div:last-child,
+#play > #hud .btn {
 	pointer-events: auto;
 }
 
-#play > div:not(:has(> h2)) .btn {
+#play > #hud .btn {
 	color: var(--text);
 
 	background: rgb(7 8 10 / 0.55);
 	border: 1px solid rgb(255 255 255 / 0.12);
 }
 
-#play > div:not(:has(> h2)) .btn:hover {
+#play > #hud .btn:hover {
 	border-color: var(--accent);
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child {
+#play > #hud .pad-list {
 	width: auto;
 	min-width: 0;
 	max-width: min(28rem, 100%);
@@ -222,7 +222,7 @@
 	overflow-y: auto;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button {
+#play > #hud .pad-list > button {
 	min-width: 0;
 
 	color: var(--text);
@@ -247,28 +247,28 @@
 	cursor: pointer;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-state="off"] {
+#play > #hud .pad-list > button[data-state="off"] {
 	opacity: 0.55;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-state="live"] {
+#play > #hud .pad-list > button[data-state="live"] {
 	border-color: var(--accent);
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-active="true"] {
+#play > #hud .pad-list > button[data-active="true"] {
 	box-shadow: inset 0.2rem 0 0 var(--accent);
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button:hover:not(:disabled),
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button:focus-visible {
+#play > #hud .pad-list > button:hover:not(:disabled),
+#play > #hud .pad-list > button:focus-visible {
 	border-color: var(--accent);
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button:disabled {
+#play > #hud .pad-list > button:disabled {
 	cursor: not-allowed;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button > span:first-of-type {
+#play > #hud .pad-list > button > span:first-of-type {
 	min-width: 0;
 
 	text-overflow: ellipsis;
@@ -279,7 +279,7 @@
 	overflow: hidden;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button > span:last-of-type {
+#play > #hud .pad-list > button > span:last-of-type {
 	color: var(--muted);
 	font-size: 0.7rem;
 	font-weight: 600;
@@ -290,11 +290,11 @@
 	flex: 0 0 auto;
 }
 
-#play > div:not(:has(> h2)) > div:last-child > div:first-child > button[data-state="live"] > span:last-of-type {
+#play > #hud .pad-list > button[data-state="live"] > span:last-of-type {
 	color: var(--accent);
 }
 
-#play > div:not(:has(> h2)) > div:last-child > p {
+#play > #hud > div:last-child > p {
 	max-width: 22rem;
 
 	color: var(--muted);
@@ -304,6 +304,11 @@
 	text-align: center;
 
 	margin: 0;
+}
+
+#play > #hud > div:last-child > .btn {
+	min-height: 2.25rem;
+	align-self: center;
 }
 
 #play > dl {
@@ -415,7 +420,8 @@
 	flex-shrink: 0;
 }
 
-#play > aside > label:not(.field) {
+#play > aside > label:not(.field),
+#play > aside > section > label:not(.field) {
 	color: var(--text);
 	font-size: var(--text-sm);
 	line-height: 1.35;
@@ -448,30 +454,6 @@
 	text-transform: uppercase;
 }
 
-#play > aside > section > dl {
-	display: flex;
-	flex-direction: column;
-	justify-content: flex-start;
-	align-items: stretch;
-	flex-wrap: nowrap;
-	gap: 0.4rem;
-}
-
-#play > aside > section > dl > div {
-	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
-	align-items: flex-start;
-	flex-wrap: nowrap;
-	gap: var(--space-3);
-}
-
-#play > aside > section dt {
-	font-family: var(--font-mono);
-	font-size: 0.7rem;
-}
-
-#play > aside > section dd,
 #play > aside > section > p {
 	color: var(--muted);
 	font-size: var(--text-sm);
@@ -513,53 +495,62 @@
 }
 
 @media (max-width: 900px) {
-	#play > div:not(:has(> h2)) > div:first-child {
+	#play > #hud > div:first-child {
 		flex-direction: column;
 		justify-content: flex-start;
 		align-items: stretch;
 		gap: var(--space-3);
 	}
 
-	#play > div:not(:has(> h2)) > div:first-child > div:last-child {
+	#play > #hud > div:first-child > div:last-child {
 		width: 100%;
 		flex: none;
 		justify-content: flex-start;
 	}
 
-	#play > div:not(:has(> h2)) > div:first-child > span:nth-of-type(2) {
+	#play > #hud > div:first-child > span:nth-of-type(2) {
 		align-self: flex-start;
 	}
 
-	#play > div:not(:has(> h2)) > div:first-child > .brand {
+	#play > #hud > div:first-child > .brand {
 		flex: none;
 	}
-}
 
-@media (max-width: 640px) {
-	#play > div:not(:has(> h2)) {
-		padding: var(--space-3);
-		padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-	}
-
-	#play > div:not(:has(> h2)) > div:first-child > .brand {
-		display: none;
-	}
-
-	#play > div:not(:has(> h2)) > div:last-child {
+	#play > #hud > div:last-child {
 		padding-inline: 0;
 	}
 
-	#play > div:not(:has(> h2)) > div:last-child > div:first-child {
+	#play > #hud .pad-list {
 		width: 100%;
 		max-width: none;
 	}
 
-	#play > div:not(:has(> h2)) > div:last-child > div:last-child {
+	#play > #hud > div:last-child > div:last-child {
 		position: static;
 		align-self: flex-end;
 	}
+}
 
-	#play > div:not(:has(> h2)) > div:last-child > div:last-child > .btn-icon {
+@media (max-width: 640px) {
+	#play > #hud {
+		padding: var(--space-3);
+		padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+	}
+
+	#play > #hud > div:first-child > .brand {
+		display: none;
+	}
+
+	#play > #hud .pad-list {
+		max-height: none;
+	}
+
+	#play > #hud > div:last-child > .btn {
+		width: 100%;
+		align-self: stretch;
+	}
+
+	#play > #hud > div:last-child > div:last-child > .btn-icon {
 		width: 2.5rem;
 		height: 2.5rem;
 		min-width: 2.5rem;
@@ -573,11 +564,6 @@
 		padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
 
 		border-left: 0;
-	}
-
-	#play > aside > section > dl > div {
-		flex-direction: column;
-		gap: 0.15rem;
 	}
 
 	#play > dl {

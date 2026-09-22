@@ -1,5 +1,5 @@
 <h1 align="center">
-	<font color="#3ee6a0">s2</font>pipe
+	s2pipe
 </h1>
 
 <p align="center">
@@ -112,6 +112,8 @@ s2pipe start --help
 
 Click a gamepad at the bottom to take a Pico seat (max 8 in total, several per browser). Click again to release it. Esc
 = settings. The HUD stays on until fullscreen.
+
+No gamepad: **Use virtual controller** (keyboard and mouse).
 
 `n/8 playing` is Pico seats taken, not Switch player numbers. Pills: capture, Pico, WebSocket.
 

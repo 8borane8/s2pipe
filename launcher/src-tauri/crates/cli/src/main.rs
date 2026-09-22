@@ -140,8 +140,12 @@ async fn run() -> Result<(), String> {
 
     match Cli::parse().command {
         Command::Start(args) => {
-            let config = args.merge(load_config()?.unwrap_or_default());
-            println!("Starting s2pipe...");
+            let loaded = load_config()?;
+            let config = args.merge(loaded.clone().unwrap_or_default());
+            match loaded {
+                Some(_) => println!("Starting s2pipe (from ~/.s2pipe/config.json)..."),
+                None => println!("Starting s2pipe (defaults, no ~/.s2pipe/config.json)..."),
+            }
             Stack::start(config).await?;
             println!("s2pipe is running in the background. Use `s2pipe stop` to stop it.");
             Ok(())

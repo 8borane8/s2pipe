@@ -50,6 +50,11 @@
 	border-color: var(--accent-hover);
 }
 
+.btn-block {
+	width: 100%;
+	justify-content: center;
+}
+
 .btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
@@ -85,7 +90,8 @@
 	appearance: auto;
 }
 
-.field > input:not([type="checkbox"]):not([type="range"]) {
+.field > input:not([type="checkbox"]):not([type="range"]),
+.field > select {
 	width: 100%;
 	color: var(--text);
 	font-family: var(--font-sans);
@@ -96,7 +102,8 @@
 	border-radius: var(--radius);
 }
 
-.field > input:not([type="checkbox"]):not([type="range"]):focus {
+.field > input:not([type="checkbox"]):not([type="range"]):focus,
+.field > select:focus {
 	border-color: var(--accent);
 	outline: none;
 }

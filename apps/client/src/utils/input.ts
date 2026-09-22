@@ -82,7 +82,7 @@ function fromAxes(lx: number, ly: number, rx: number, ry: number, buttons: numbe
 	};
 }
 
-function isTyping(target: EventTarget | null): boolean {
+export function isTyping(target: EventTarget | null): boolean {
 	return (
 		target instanceof HTMLElement &&
 		Boolean(target.closest("input, select, textarea"))

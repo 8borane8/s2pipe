@@ -53,10 +53,10 @@ surfaced. Logs go to `~/.s2pipe/logs` (`node.log`, `client.log`, `mediamtx.log`,
 `ffmpeg-video.log`, `ffmpeg-audio.log`). When a process dies at start, the last log lines are included in the error.
 
 FFmpeg is the fragile part, so every launch is a list of attempts: the first process whose `out_time_us` goes above zero
-wins, since a missing GPU runtime can keep the process alive for a couple of seconds without muxing anything. Video walks
-the encoder backends, then retries them with size, framerate and pixel format dropped. Audio asks for a short capture
-buffer first and falls back to the device default. FFmpeg warnings land in `~/.s2pipe/logs`; the last 30 lines are
-included in the error message.
+wins, since a missing GPU runtime can keep the process alive for a couple of seconds without muxing anything. Video
+walks the encoder backends, then retries them with size, framerate and pixel format dropped. Audio asks for a short
+capture buffer first and falls back to the device default. FFmpeg warnings land in `~/.s2pipe/logs`; the last 30 lines
+are included in the error message.
 
 The watchdog is the same GUI or CLI binary, copied to `~/.s2pipe/launcher` on launch. It runs `--watchdog`, starts video
 and audio, reads `-progress pipe:2` in memory (stderr, not a file), and every second checks that `out_time_us` still

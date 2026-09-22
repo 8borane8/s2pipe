@@ -15,7 +15,17 @@ import {
 	type StreamStats,
 	type WhepHandle,
 } from "../utils/whep.ts";
+import { holdPage } from "../utils/page-session.ts";
 import { loadPlayPrefs, savePlayPrefs } from "../utils/prefs.ts";
+import {
+	createVirtualPad,
+	defaultVirtualPrefs,
+	loadVirtualPrefs,
+	saveVirtualPrefs,
+	VIRTUAL_PREFS_KEY,
+	type VirtualPad,
+	type VirtualPrefs,
+} from "../utils/virtual/mod.ts";
 
 type Props = {
 	nodeUrl: string;
@@ -87,6 +97,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const audioRef = useRef<AudioWhepHandle | null>(null);
 	const wsRef = useRef<WebSocket | null>(null);
 	const inputRef = useRef<ReturnType<typeof createInputTracker> | null>(null);
+	const virtualRef = useRef<VirtualPad | null>(null);
+	const persistVirtual = useRef(false);
 	const statsPrev = useRef<{ bytes: number; at: number } | null>(null);
 	const toastSeq = useRef(0);
 	const pendingPlays = useRef(0);
@@ -101,6 +113,8 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	const occupied = useSignal<number[]>([]);
 	const livePads = useSignal<number[]>([]);
 	const settings = useSignal(false);
+	const virtualPrefs = useSignal<VirtualPrefs>(defaultVirtualPrefs());
+	const virtualLive = useSignal(false);
 	const muted = useSignal(false);
 	const volume = useSignal(1);
 	const fill = useSignal(false);
@@ -116,6 +130,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		volume.value = prefs.volume;
 		fill.value = prefs.fill;
 		showStats.value = prefs.showStats;
+		virtualPrefs.value = loadVirtualPrefs();
 	}, []);
 
 	useEffect(() => {
@@ -130,6 +145,30 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			showStats: showStats.value,
 		});
 	}, [muted.value, volume.value, fill.value, showStats.value]);
+
+	useEffect(() => {
+		if (!persistVirtual.current) {
+			persistVirtual.current = true;
+			return;
+		}
+		saveVirtualPrefs(virtualPrefs.value);
+	}, [virtualPrefs.value]);
+
+	useEffect(() => {
+		const onStorage = (event: StorageEvent) => {
+			if (event.key !== VIRTUAL_PREFS_KEY) return;
+			const next = loadVirtualPrefs();
+			virtualPrefs.value = { ...next, enabled: virtualPrefs.value.enabled };
+		};
+		globalThis.addEventListener("storage", onStorage);
+		return holdPage(() => globalThis.removeEventListener("storage", onStorage));
+	}, []);
+
+	useEffect(() => {
+		if (!virtualPrefs.value.enabled || !connected.value) return;
+		if (seats.value.length > 0) return;
+		syncSeats(1);
+	}, [virtualPrefs.value.enabled, connected.value]);
 
 	function toast(text: string): void {
 		const id = ++toastSeq.current;
@@ -161,6 +200,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		const connect = async () => {
 			try {
 				videoHandle = await startWhep(nodeUrl, video);
+				if (cancelled) {
+					void videoHandle.close();
+					videoHandle = null;
+					return;
+				}
 				whepRef.current = videoHandle;
 				live.value = true;
 
@@ -184,6 +228,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 			try {
 				audioHandle = await startAudioWhep(nodeUrl);
+				if (cancelled) {
+					cleanupWhep();
+					return;
+				}
 				if (audioHandle) {
 					audioRef.current = audioHandle;
 					audioHandle.audio.muted = muted.value;
@@ -196,11 +244,13 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 		void connect();
 
-		return () => {
+		return holdPage(() => {
 			cancelled = true;
 			clearTimeout(retryTimer);
 			cleanupWhep();
-		};
+			video.pause();
+			video.srcObject = null;
+		});
 	}, [nodeUrl]);
 
 	useEffect(() => {
@@ -216,10 +266,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		};
 		video.addEventListener("webkitendfullscreen", onEnd);
 		video.addEventListener("webkitbeginfullscreen", onBegin);
-		return () => {
+		return holdPage(() => {
 			video.removeEventListener("webkitendfullscreen", onEnd);
 			video.removeEventListener("webkitbeginfullscreen", onBegin);
-		};
+		});
 	}, []);
 
 	// Gestion WebSocket (Statut et Commandes)
@@ -235,7 +285,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 			socket.addEventListener("open", () => {
 				connected.value = true;
-				const count = chosen.value.length;
+				const count = virtualPrefs.value.enabled ? 1 : chosen.value.length;
 				if (!count) return;
 				pendingPlays.current += 1;
 				send(socket, { op: "play", data: { count } });
@@ -250,6 +300,11 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						const granted = msg.data.seats;
 						seats.value = granted;
 						if (pendingPlays.current > 0) return;
+						if (virtualPrefs.value.enabled) {
+							if (granted.length >= 1) return;
+							toast("All remote pads are taken.");
+							return;
+						}
 						const selected = selectedPads(pads.value, chosen.value);
 						if (granted.length >= selected.length) return;
 						chosen.value = selected.slice(0, granted.length).map((pad) => pad.index);
@@ -280,12 +335,14 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 		connectWs();
 
-		return () => {
+		return holdPage(() => {
 			isClosed = true;
 			clearTimeout(retryTimer);
 			socket?.close();
 			wsRef.current = null;
-		};
+			if (document.pointerLockElement) document.exitPointerLock();
+			if (document.fullscreenElement) void document.exitFullscreen();
+		});
 	}, [nodeUrl]);
 
 	// Gestion des manettes (Gamepads)
@@ -296,9 +353,10 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 
 		const updatePads = () => {
 			const next = listGamepads();
+			pads.value = next;
+			if (virtualPrefs.value.enabled) return;
 			const still = chosen.value.filter((index) => next.some((pad) => pad.index === index));
 			const lost = still.length !== chosen.value.length;
-			pads.value = next;
 			chosen.value = still;
 			if (lost) syncSeats(still.length);
 		};
@@ -307,13 +365,29 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		globalThis.addEventListener("gamepadconnected", updatePads);
 		globalThis.addEventListener("gamepaddisconnected", updatePads);
 
-		return () => {
+		return holdPage(() => {
 			tracker.detach();
 			inputRef.current = null;
 			globalThis.removeEventListener("gamepadconnected", updatePads);
 			globalThis.removeEventListener("gamepaddisconnected", updatePads);
-		};
+		});
 	}, []);
+
+	useEffect(() => {
+		if (!virtualPrefs.value.enabled) {
+			virtualRef.current?.detach();
+			virtualRef.current = null;
+			virtualLive.value = false;
+			return;
+		}
+		const pad = createVirtualPad();
+		virtualRef.current = pad;
+		pad.attach();
+		return holdPage(() => {
+			pad.detach();
+			if (virtualRef.current === pad) virtualRef.current = null;
+		});
+	}, [virtualPrefs.value.enabled]);
 
 	// Boucle d'envoi des inputs de la manette
 	useEffect(() => {
@@ -321,8 +395,39 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		const lastBySeat = new Map<number, PadState>();
 		let lastAssignedKey = "";
 
+		let alive = true;
 		const loop = () => {
+			if (!alive) return;
 			frame = requestAnimationFrame(loop);
+
+			if (virtualPrefs.value.enabled) {
+				const virtual = virtualRef.current;
+				const state = virtual?.sample(virtualPrefs.value) ?? NEUTRAL;
+				const active = !samePad(state, NEUTRAL);
+				if (active !== virtualLive.value) virtualLive.value = active;
+
+				const ws = wsRef.current;
+				const assigned = seats.value;
+				if (!ws || ws.readyState !== WebSocket.OPEN || !assigned.length) {
+					if (lastAssignedKey) {
+						lastBySeat.clear();
+						lastAssignedKey = "";
+					}
+					return;
+				}
+				const assignedKey = assigned.join(",");
+				if (assignedKey !== lastAssignedKey) {
+					lastBySeat.clear();
+					lastAssignedKey = assignedKey;
+				}
+				const seat = assigned[0]!;
+				const previous = lastBySeat.get(seat);
+				if (previous && samePad(previous, state)) return;
+				lastBySeat.set(seat, state);
+				send(ws, { op: "pad", data: state, seat });
+				return;
+			}
+
 			const tracker = inputRef.current;
 			if (!tracker) return;
 
@@ -369,17 +474,21 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		};
 
 		frame = requestAnimationFrame(loop);
-		return () => cancelAnimationFrame(frame);
+		return holdPage(() => {
+			alive = false;
+			cancelAnimationFrame(frame);
+		});
 	}, []);
 
 	// Raccourci Clavier (Échap pour les paramètres)
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.code !== "Escape" || event.repeat) return;
+			if (document.pointerLockElement) return;
 			settings.value = !settings.value;
 		};
 		globalThis.addEventListener("keydown", onKey);
-		return () => globalThis.removeEventListener("keydown", onKey);
+		return holdPage(() => globalThis.removeEventListener("keydown", onKey));
 	}, []);
 
 	// Synchro Volume / Mute
@@ -405,7 +514,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				stats.value = result.stats;
 			}).catch(() => {});
 		}, 1000);
-		return () => clearInterval(timer);
+		return holdPage(() => clearInterval(timer));
 	}, [showStats.value]);
 
 	// Gestion Plein Écran
@@ -416,7 +525,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			if (on) settings.value = false;
 		};
 		document.addEventListener("fullscreenchange", onFs);
-		return () => document.removeEventListener("fullscreenchange", onFs);
+		return holdPage(() => document.removeEventListener("fullscreenchange", onFs));
 	}, []);
 
 	function syncSeats(count: number): void {
@@ -433,15 +542,41 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 	}
 
 	function toggleSeat(index: number): void {
+		if (virtualPrefs.value.enabled) return;
 		const claimed = chosen.value.includes(index);
 		if (!claimed && occupied.value.length >= PAD_COUNT) return;
 		chosen.value = claimed ? chosen.value.filter((item) => item !== index) : [...chosen.value, index];
 		syncSeats(chosen.value.length);
 	}
 
+	function setVirtualEnabled(enabled: boolean): void {
+		if (enabled === virtualPrefs.value.enabled) {
+			if (enabled) syncSeats(1);
+			return;
+		}
+		if (enabled) {
+			if (occupied.value.length >= PAD_COUNT && seats.value.length === 0) {
+				toast("All remote pads are taken.");
+				return;
+			}
+			chosen.value = [];
+			virtualPrefs.value = { ...virtualPrefs.value, enabled: true };
+			syncSeats(1);
+			return;
+		}
+		virtualPrefs.value = { ...virtualPrefs.value, enabled: false };
+		syncSeats(0);
+	}
+
 	function onStageClick(): void {
 		void videoRef.current?.play();
 		void audioRef.current?.audio.play();
+		if (settings.value) return;
+		const virtual = virtualRef.current;
+		if (!virtual || !virtualPrefs.value.enabled) return;
+		if (virtual.usesMouseAxis(virtualPrefs.value) && stageRef.current) {
+			virtual.requestPointerLock(stageRef.current);
+		}
 	}
 
 	function toggleFullscreen(): void {
@@ -470,6 +605,9 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 			data-fill={fill.value ? "true" : undefined}
 			data-idle={hideHud ? "true" : undefined}
 			onClick={onStageClick}
+			onContextMenu={(event) => {
+				if (virtualPrefs.value.enabled) event.preventDefault();
+			}}
 			onDblClick={(event) => {
 				event.preventDefault();
 				toggleFullscreen();
@@ -509,7 +647,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				</dl>
 			)}
 
-			<div onClick={(event) => event.stopPropagation()}>
+			<div id="hud" onClick={(event) => event.stopPropagation()}>
 				<div>
 					<span className="brand">
 						<span>s2</span>pipe
@@ -539,9 +677,24 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 				</div>
 
 				<div>
-					{pads.value.length > 0
+					{virtualPrefs.value.enabled
 						? (
-							<div>
+							<div className="pad-list">
+								<button
+									type="button"
+									data-state={seats.value[0] !== undefined ? "live" : "ready"}
+									data-active={virtualLive.value ? "true" : undefined}
+									disabled={!connected.value}
+									onClick={() => setVirtualEnabled(false)}
+								>
+									<span>Virtual controller</span>
+									<span>{seats.value[0] !== undefined ? `P${seats.value[0] + 1}` : "..."}</span>
+								</button>
+							</div>
+						)
+						: pads.value.length > 0
+						? (
+							<div className="pad-list">
 								{pads.value.map((pad) => {
 									const seat = seatByIndex.get(pad.index);
 									const claimed = chosen.value.includes(pad.index);
@@ -570,7 +723,19 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 								})}
 							</div>
 						)
-						: <p>Connect a gamepad, then click it to play.</p>}
+						: (
+							<>
+								<p>Connect a gamepad, then click it to play.</p>
+								<button
+									type="button"
+									className="btn"
+									disabled={!connected.value || occupied.value.length >= PAD_COUNT}
+									onClick={() => setVirtualEnabled(true)}
+								>
+									Use virtual controller
+								</button>
+							</>
+						)}
 					<div>
 						<button
 							type="button"
@@ -656,6 +821,23 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					</label>
 
 					<section>
+						<h3>Virtual controller</h3>
+						<label>
+							<input
+								type="checkbox"
+								checked={virtualPrefs.value.enabled}
+								onChange={(event) => setVirtualEnabled((event.target as HTMLInputElement).checked)}
+							/>
+							Enable virtual controller
+						</label>
+						<p>
+							Keyboard and mouse drive one Pico seat. Physical gamepads on this browser are ignored while
+							this is on. It stays off after a reload.
+						</p>
+						<a className="btn btn-block" href="/controller">Map buttons</a>
+					</section>
+
+					<section>
 						<h3>Home</h3>
 						<p>
 							Home on the Switch is the Xbox Guide / PS button. Capture / Share is Capture. Windows and
@@ -673,16 +855,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 							Last resort: hold Minus and Plus together (View + Menu, Select + Start, or - and +). That
 							sends Home without using Guide.
 						</p>
-						<dl>
-							<div>
-								<dt>H / G</dt>
-								<dd>Home / Capture</dd>
-							</div>
-							<div>
-								<dt>Esc</dt>
-								<dd>Settings</dd>
-							</div>
-						</dl>
 					</section>
 				</aside>
 			)}
