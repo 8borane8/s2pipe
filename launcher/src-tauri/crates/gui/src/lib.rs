@@ -19,10 +19,21 @@ pub fn run() {
 
     let _ = install_launcher();
 
+    // The AppImage GTK hook forces x11. A Wayland session with no X server then aborts in gtk_init.
+    #[cfg(target_os = "linux")]
+    if std::env::var("GDK_BACKEND").ok().as_deref().unwrap_or("x11") == "x11" {
+        std::env::set_var("GDK_BACKEND", "wayland,x11");
+    }
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            show_window(app);
-        }))
+        .plugin(
+            tauri_plugin_single_instance::Builder::new()
+                .callback(|app, _argv, _cwd| {
+                    show_window(app);
+                })
+                .dbus_id("s2pipe")
+                .build(),
+        )
         .setup(|app| {
             let handle = app.handle().clone();
             let launched_at_startup = has_arg("--autostart");
