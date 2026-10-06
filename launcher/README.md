@@ -7,13 +7,17 @@ whole stack detached.
 
 Download from [Releases](https://github.com/8borane8/s2pipe/releases):
 
-| File                        | What it is                         |
-| --------------------------- | ---------------------------------- |
-| `s2pipe-<version>.exe`      | Portable GUI (Windows, no install) |
-| `s2pipe-<version>.AppImage` | Portable GUI (Linux, no install)   |
-| `s2pipe-<version>.msi`      | GUI installer (Windows)            |
-| `s2pipe-<version>.deb`      | GUI installer (Debian / Ubuntu)    |
-| `s2pipe-cli-<version>.*`    | CLI, single binary, no install     |
+| File                                 | What it is                         |
+| ------------------------------------ | ---------------------------------- |
+| `s2pipe-<version>.exe`               | Portable GUI (Windows, no install) |
+| `s2pipe-<version>.msi`               | GUI installer (Windows)            |
+| `s2pipe-<version>-x86_64.AppImage`   | Portable GUI (Linux x86_64)        |
+| `s2pipe-<version>-aarch64.AppImage`  | Portable GUI (Linux aarch64)       |
+| `s2pipe-<version>-x86_64.deb`        | GUI installer (Debian / Ubuntu x86_64) |
+| `s2pipe-<version>-aarch64.deb`       | GUI installer (Debian / Ubuntu aarch64) |
+| `s2pipe-cli-<version>.exe`           | CLI (Windows)                      |
+| `s2pipe-cli-<version>-x86_64`        | CLI (Linux x86_64)                 |
+| `s2pipe-cli-<version>-aarch64`       | CLI (Linux aarch64)                |
 
 Nothing else is required. The Deno apps (`apps/`, `shared/`, `deno.json`) are baked into the binary at compile time with
 `include_dir`, so a bare `.exe` carries the full stack.
@@ -128,4 +132,4 @@ DirectShow on Windows; FFmpeg has no WASAPI demuxer.
 `runtime/ffmpeg` is split by concern: `input.rs` builds the capture arguments, `encoder.rs` the codec arguments,
 `mod.rs` runs the attempt list and spawns FFmpeg, and `watchdog.rs` supervises `out_time_us` and restarts on freeze.
 
-Releases are cut by pushing a `v*` tag; `.github/workflows/launcher.yml` builds both binaries on Windows and Linux.
+Releases are cut by pushing a `v*` tag; `.github/workflows/launcher.yml` builds both binaries on Windows and on Linux x86_64 and aarch64.

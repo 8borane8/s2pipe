@@ -16,11 +16,19 @@ pub async fn ensure() -> Result<(), String> {
             ),
             format!("mediamtx-{MEDIAMTX_VERSION}.zip"),
         )
-    } else if cfg!(target_os = "linux") {
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         (
             format!(
                 "https://github.com/bluenviron/mediamtx/releases/download/v{MEDIAMTX_VERSION}/\
                  mediamtx_v{MEDIAMTX_VERSION}_linux_amd64.tar.gz"
+            ),
+            format!("mediamtx-{MEDIAMTX_VERSION}.tar.gz"),
+        )
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        (
+            format!(
+                "https://github.com/bluenviron/mediamtx/releases/download/v{MEDIAMTX_VERSION}/\
+                 mediamtx_v{MEDIAMTX_VERSION}_linux_arm64.tar.gz"
             ),
             format!("mediamtx-{MEDIAMTX_VERSION}.tar.gz"),
         )

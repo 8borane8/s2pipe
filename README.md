@@ -51,7 +51,7 @@ Equivalents are fine.
 
 ## 2. Install the launcher
 
-Download the Windows or Linux build from [Releases](https://github.com/8borane8/s2pipe/releases). Run it. First start
+Download the Windows or Linux build (x86_64 or aarch64) from [Releases](https://github.com/8borane8/s2pipe/releases). Run it. First start
 fetches FFmpeg, MediaMTX, and Deno into `~/.s2pipe/bins/`.
 
 On **Windows**, install the CP2102 UART driver first or the Pico port never appears:

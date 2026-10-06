@@ -27,11 +27,19 @@ pub async fn ensure() -> Result<(), String> {
             ),
             format!("ffmpeg-{FFMPEG_VERSION}.zip"),
         )
-    } else if cfg!(target_os = "linux") {
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         (
             format!(
                 "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/\
                  ffmpeg-n{FFMPEG_VERSION}-latest-linux64-gpl-{FFMPEG_VERSION}.tar.xz"
+            ),
+            format!("ffmpeg-{FFMPEG_VERSION}.tar.xz"),
+        )
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        (
+            format!(
+                "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/\
+                 ffmpeg-n{FFMPEG_VERSION}-latest-linuxarm64-gpl-{FFMPEG_VERSION}.tar.xz"
             ),
             format!("ffmpeg-{FFMPEG_VERSION}.tar.xz"),
         )

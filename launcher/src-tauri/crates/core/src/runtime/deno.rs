@@ -21,11 +21,19 @@ pub async fn ensure() -> Result<PathBuf, String> {
             ),
             format!("deno-{DENO_VERSION}.zip"),
         )
-    } else if cfg!(target_os = "linux") {
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         (
             format!(
                 "https://github.com/denoland/deno/releases/download/v{DENO_VERSION}/\
                  deno-x86_64-unknown-linux-gnu.zip"
+            ),
+            format!("deno-{DENO_VERSION}.zip"),
+        )
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        (
+            format!(
+                "https://github.com/denoland/deno/releases/download/v{DENO_VERSION}/\
+                 deno-aarch64-unknown-linux-gnu.zip"
             ),
             format!("deno-{DENO_VERSION}.zip"),
         )

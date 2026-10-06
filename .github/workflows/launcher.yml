@@ -23,8 +23,13 @@ jobs:
                 include:
                     - platform: windows-latest
                       args: --bundles msi
+                      asset_arch: ""
                     - platform: ubuntu-22.04
                       args: --bundles deb,appimage
+                      asset_arch: x86_64
+                    - platform: ubuntu-22.04-arm
+                      args: --bundles deb,appimage
+                      asset_arch: aarch64
         runs-on: ${{ matrix.platform }}
         steps:
             - name: Checkout
@@ -39,7 +44,7 @@ jobs:
               uses: dtolnay/rust-toolchain@stable
 
             - name: Linux dependencies
-              if: matrix.platform == 'ubuntu-22.04'
+              if: runner.os == 'Linux'
               run: |
                   sudo apt-get update
                   sudo apt-get install -y \
@@ -63,6 +68,7 @@ jobs:
               uses: tauri-apps/tauri-action@v0
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  APPIMAGE_EXTRACT_AND_RUN: "1"
               with:
                   projectPath: launcher
                   tauriScript: deno task tauri
@@ -71,16 +77,22 @@ jobs:
 
             - name: Collect artifacts
               shell: bash
+              env:
+                  ASSET_ARCH: ${{ matrix.asset_arch }}
               run: |
                   # Pull request refs look like "5/merge", which is not a valid file name.
                   version="${GITHUB_REF_NAME//\//-}"
+                  suffix=""
+                  if [ -n "$ASSET_ARCH" ]; then
+                      suffix="-$ASSET_ARCH"
+                  fi
                   mkdir -p release
 
                   cli=launcher/src-tauri/target/release/s2pipe
                   if [ -f "$cli.exe" ]; then
                       cp "$cli.exe" "release/s2pipe-cli-$version.exe"
                   else
-                      cp "$cli" "release/s2pipe-cli-$version"
+                      cp "$cli" "release/s2pipe-cli-$version$suffix"
                   fi
 
                   # Windows GUI is a single .exe (WebView2 is already on the OS). Linux needs the
@@ -100,7 +112,7 @@ jobs:
                       case "$path" in
                           *.sig | *.json) continue ;;
                       esac
-                      cp "$path" "release/s2pipe-$version.${path##*.}"
+                      cp "$path" "release/s2pipe-$version$suffix.${path##*.}"
                   done
 
             - name: Upload artifacts
