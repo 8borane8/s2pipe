@@ -182,3 +182,40 @@ fn list_linux_audio_devices() -> Result<Vec<AudioDevice>, String> {
         })
         .collect())
 }
+
+/// The bundled FFmpeg has no ALSA demuxer, only PulseAudio (which PipeWire also serves). Maps a
+/// listed `hw:card,device` endpoint to the Pulse source on the same ALSA card, or returns the
+/// input unchanged when it is not an `hw:` name or no source matches.
+#[cfg(target_os = "linux")]
+pub(crate) fn pulse_source_for(device: &str) -> String {
+    let Some((card, dev)) = device.strip_prefix("hw:").and_then(|d| d.split_once(',')) else {
+        return device.to_string();
+    };
+    let output = std::process::Command::new("pactl")
+        .args(["list", "sources"])
+        .env("LC_ALL", "C")
+        .output();
+    let Ok(output) = output else {
+        return device.to_string();
+    };
+    let text = String::from_utf8_lossy(&output.stdout);
+    for block in text.split("Source #").skip(1) {
+        let value = |key: &str| {
+            block
+                .lines()
+                .find_map(|line| line.trim().strip_prefix(key))
+                .map(|rest| rest.trim().trim_matches('"').to_string())
+        };
+        if value("device.class = ").as_deref() == Some("monitor") {
+            continue;
+        }
+        if value("alsa.card = ").as_deref() == Some(card)
+            && value("alsa.device = ").as_deref() == Some(dev)
+        {
+            if let Some(name) = value("Name: ") {
+                return name;
+            }
+        }
+    }
+    device.to_string()
+}
