@@ -196,8 +196,25 @@ pub fn kill_pid_force(pid: u32) {
     unix_kill(pid, "-KILL");
 }
 
+/// Whether `pid` still runs one of our binaries: everything we spawn lives in `~/.s2pipe`, except
+/// the system `deno` that debug builds use.
+/// `stack.json` can outlive a reboot, and its pids may then belong to anything, including the
+/// desktop session, which `kill -<pgid>` would take down with it.
+#[cfg(unix)]
+fn is_ours(pid: u32) -> bool {
+    let Ok(root) = crate::utils::paths::app_directory() else {
+        return false;
+    };
+    std::fs::read_link(format!("/proc/{pid}/exe")).is_ok_and(|exe| {
+        exe.starts_with(root) || exe.file_name().is_some_and(|name| name == "deno")
+    })
+}
+
 #[cfg(unix)]
 fn unix_kill(pid: u32, signal: &str) {
+    if pid <= 1 || !is_ours(pid) {
+        return;
+    }
     let _ = Command::new("kill")
         .args([signal, &format!("-{pid}")])
         .stdin(Stdio::null())
@@ -239,7 +256,7 @@ pub fn pid_alive(pid: u32) -> bool {
 
     #[cfg(unix)]
     {
-        Path::new(&format!("/proc/{pid}")).exists()
+        Path::new(&format!("/proc/{pid}")).exists() && is_ours(pid)
     }
 
     #[cfg(not(any(windows, unix)))]
