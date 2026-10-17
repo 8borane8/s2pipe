@@ -741,7 +741,7 @@ function App() {
 							/>
 
 							<small>
-								Browsers enter this on the connect page. It is sent as Authorization on every node request.
+								Browsers are asked for it only when the node refuses the connection. It is sent as Authorization on every node request.
 							</small>
 						</label>
 

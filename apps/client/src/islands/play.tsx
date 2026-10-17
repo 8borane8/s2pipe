@@ -30,7 +30,6 @@ import {
 
 type Props = {
 	nodeUrl: string;
-	nodeLocked: boolean;
 };
 
 type Toast = { id: number; text: string };
@@ -93,7 +92,7 @@ function streamBanner(
 	return null;
 }
 
-export default function Play({ nodeUrl, nodeLocked }: Props) {
+export default function Play({ nodeUrl }: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const stageRef = useRef<HTMLElement>(null);
 	const whepRef = useRef<WhepHandle | null>(null);
@@ -786,7 +785,6 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						<span>Node</span>
 						<div>
 							<p>{nodeUrl}</p>
-							{!nodeLocked && <a className="btn" href="/set-node">Modify</a>}
 						</div>
 					</div>
 

@@ -416,10 +416,6 @@
 	white-space: nowrap;
 }
 
-#play > aside .field > div > .btn {
-	flex-shrink: 0;
-}
-
 #play > aside > label:not(.field),
 #play > aside > section > label:not(.field) {
 	color: var(--text);

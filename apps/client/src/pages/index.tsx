@@ -1,8 +1,7 @@
 import type { Page } from "@webtools/slick-server";
 
 import Play from "../islands/play.tsx";
-import { nodeUrl, nodeUrlLocked } from "../client.ts";
-import { healthStatus } from "../utils/authorization.ts";
+import { healthStatus, nodeUrl } from "../utils/authorization.ts";
 
 export default {
 	url: "/",
@@ -14,19 +13,12 @@ export default {
 	scripts: [],
 
 	head: null,
-	body: (req) => (
-		<Play
-			nodeUrl={nodeUrl(req.cookies.nodeUrl)!}
-			nodeLocked={nodeUrlLocked()}
-		/>
-	),
+	body: () => <Play nodeUrl={nodeUrl()} />,
 
 	onpost: null,
 	onrequest: async (req, res) => {
-		const url = nodeUrl(req.cookies.nodeUrl);
-		if (!url) return res.redirect("/set-node");
-
-		const status = await healthStatus(url, req.cookies.nodePassword);
-		if (status === 401) return res.redirect("/set-node");
+		if (await healthStatus(nodeUrl(), req.cookies.nodePassword) === 401) {
+			return res.redirect("/password");
+		}
 	},
 } satisfies Page;

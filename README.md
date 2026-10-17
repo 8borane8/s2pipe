@@ -160,7 +160,7 @@ deno check apps/client/src/index.ts
 
 **Node:** `cd apps/node && deno task dev` (5050). `PICO_SERIAL=/dev/ttyUSB0` or `COM3`.
 
-**Client:** `cd apps/client && deno task dev` (5000). No `NODE_BASE_URL` -> connect page.
+**Client:** `cd apps/client && deno task dev` (5000). `NODE_BASE_URL` is the node address. `/password` opens only when the node returns 401.
 
 Firmware and packet: keep `apps/node/src/utils/packet.ts` in sync with `firmware/packet.h`.
 
