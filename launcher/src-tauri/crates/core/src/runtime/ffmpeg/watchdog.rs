@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
 use crate::config::AppConfig;
+use crate::utils::paths::log_path;
 use crate::utils::process::{kill_child, Ffmpeg};
 
 use super::{should_start_audio, start_audio, start_video};
@@ -15,6 +16,16 @@ pub async fn run() -> Result<(), String> {
         .map_err(|e| format!("Failed to read watchdog config: {e}"))?;
     let config: AppConfig =
         serde_json::from_str(&json).map_err(|e| format!("Invalid watchdog config: {e}"))?;
+
+    // FFmpeg logs are appended across restarts; start clean so error tails match this launch.
+    for name in ["ffmpeg-video", "ffmpeg-audio"] {
+        let path = log_path(name)?;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)
+                .map_err(|e| format!("Failed to create log directory: {e}"))?;
+        }
+        std::fs::File::create(&path).map_err(|e| format!("Failed to reset {name} log: {e}"))?;
+    }
 
     let video = start_video(&config).await?;
     let audio = if should_start_audio(&config) {

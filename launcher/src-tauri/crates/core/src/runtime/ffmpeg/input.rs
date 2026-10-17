@@ -129,8 +129,7 @@ pub fn audio(command: &mut Command, config: &AppConfig, small_buffer: bool) -> R
     #[cfg(target_os = "linux")]
     {
         let _ = small_buffer;
-        let source = crate::modules::capture::pulse_source_for(device);
-        command.args(["-f", "pulse", "-ar", "48000", "-ac", "2", "-i", &source]);
+        command.args(["-f", "pulse", "-ar", "48000", "-ac", "2", "-i", device]);
         Ok(())
     }
 

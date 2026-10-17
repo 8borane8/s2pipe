@@ -126,8 +126,9 @@ The Rust side is a Cargo workspace under `src-tauri`:
 | `s2pipe`      | CLI                                                                      |
 
 `core` has no Tauri dependency, which is what lets the CLI exist. Device enumeration is per-OS: nokhwa and WASAPI on
-Windows, `/dev/video*` and `/proc/asound/pcm` on Linux (no `alsa-utils` needed). Capture itself always goes through
-DirectShow on Windows; FFmpeg has no WASAPI demuxer.
+Windows, V4L2 capture nodes and `pactl list sources` (PulseAudio or PipeWire) on Linux. Capture itself always goes
+through DirectShow on Windows (FFmpeg has no WASAPI demuxer) and PulseAudio on Linux (the bundled FFmpeg has no ALSA
+demuxer); the audio device is stored as a Pulse source name.
 
 `runtime/ffmpeg` is split by concern: `input.rs` builds the capture arguments, `encoder.rs` the codec arguments,
 `mod.rs` runs the attempt list and spawns FFmpeg, and `watchdog.rs` supervises `out_time_us` and restarts on freeze.

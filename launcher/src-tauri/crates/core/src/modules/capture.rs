@@ -1,4 +1,4 @@
-use nokhwa::query;
+﻿use nokhwa::query;
 use nokhwa::utils::{ApiBackend, CameraIndex};
 use serde::{Deserialize, Serialize};
 
@@ -43,7 +43,7 @@ fn device_path(index: &CameraIndex, name: &str) -> String {
 pub async fn list_capture_devices() -> Result<Vec<CaptureDevice>, String> {
     tokio::task::spawn_blocking(|| {
         let cameras = query(ApiBackend::Auto).map_err(|e| e.to_string())?;
-        Ok(cameras
+        let mut devices: Vec<CaptureDevice> = cameras
             .into_iter()
             .map(|info| {
                 let name = info.human_name();
@@ -52,10 +52,28 @@ pub async fn list_capture_devices() -> Result<Vec<CaptureDevice>, String> {
                     label: name,
                 }
             })
-            .collect())
+            .collect();
+        #[cfg(target_os = "linux")]
+        devices.retain(|device| is_capture_node(&device.path));
+        let mut seen = std::collections::HashSet::new();
+        devices.retain(|device| seen.insert(device.path.clone()));
+        Ok(devices)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// A UVC device exposes a second `/dev/videoN` for metadata (sysfs `index` > 0) that cannot
+/// capture and fails with "Inappropriate ioctl for device". Only index 0 is a capture node.
+#[cfg(target_os = "linux")]
+fn is_capture_node(path: &str) -> bool {
+    let Some(node) = path.strip_prefix("/dev/") else {
+        return true;
+    };
+    std::fs::read_to_string(format!("/sys/class/video4linux/{node}/index"))
+        .ok()
+        .and_then(|index| index.trim().parse::<u32>().ok())
+        .map_or(true, |index| index == 0)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,46 +177,26 @@ fn list_windows_audio_devices() -> Result<Vec<AudioDevice>, String> {
     }
 }
 
-/// Reads ALSA capture endpoints straight from the kernel, so the launcher does
-/// not depend on alsa-utils being installed.
+/// Lists PulseAudio sources (PipeWire serves them too), which is what the bundled FFmpeg
+/// captures from. Monitors of output devices are skipped. The path is the source name.
 #[cfg(target_os = "linux")]
 fn list_linux_audio_devices() -> Result<Vec<AudioDevice>, String> {
-    let pcm = std::fs::read_to_string("/proc/asound/pcm")
-        .map_err(|e| format!("Unable to read /proc/asound/pcm: {e}"))?;
-
-    Ok(pcm
-        .lines()
-        .filter(|line| line.contains("capture "))
-        .filter_map(|line| {
-            let mut fields = line.split(':');
-            let (card, device) = fields.next()?.trim().split_once('-')?;
-            let card: u32 = card.parse().ok()?;
-            let device: u32 = device.parse().ok()?;
-            let name = fields.next()?.trim();
-            Some(AudioDevice {
-                path: format!("hw:{card},{device}"),
-                label: format!("{name} (hw:{card},{device})"),
-            })
-        })
-        .collect())
-}
-
-/// The bundled FFmpeg has no ALSA demuxer, only PulseAudio (which PipeWire also serves). Maps a
-/// listed `hw:card,device` endpoint to the Pulse source on the same ALSA card, or returns the
-/// input unchanged when it is not an `hw:` name or no source matches.
-#[cfg(target_os = "linux")]
-pub(crate) fn pulse_source_for(device: &str) -> String {
-    let Some((card, dev)) = device.strip_prefix("hw:").and_then(|d| d.split_once(',')) else {
-        return device.to_string();
-    };
     let output = std::process::Command::new("pactl")
         .args(["list", "sources"])
         .env("LC_ALL", "C")
-        .output();
-    let Ok(output) = output else {
-        return device.to_string();
-    };
+        .output()
+        .map_err(|e| {
+            format!("Unable to run pactl ({e}). Install pulseaudio-utils or pipewire-pulse.")
+        })?;
+    if !output.status.success() {
+        return Err(format!(
+            "pactl list sources failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
     let text = String::from_utf8_lossy(&output.stdout);
+    let mut devices: Vec<AudioDevice> = Vec::new();
     for block in text.split("Source #").skip(1) {
         let value = |key: &str| {
             block
@@ -209,13 +207,14 @@ pub(crate) fn pulse_source_for(device: &str) -> String {
         if value("device.class = ").as_deref() == Some("monitor") {
             continue;
         }
-        if value("alsa.card = ").as_deref() == Some(card)
-            && value("alsa.device = ").as_deref() == Some(dev)
-        {
-            if let Some(name) = value("Name: ") {
-                return name;
-            }
+        let Some(name) = value("Name: ") else {
+            continue;
+        };
+        if devices.iter().any(|device| device.path == name) {
+            continue;
         }
+        let label = value("Description: ").unwrap_or_else(|| name.clone());
+        devices.push(AudioDevice { path: name, label });
     }
-    device.to_string()
+    Ok(devices)
 }
