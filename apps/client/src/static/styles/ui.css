@@ -85,17 +85,12 @@
 	text-transform: uppercase;
 }
 
-.field > input[type="url"],
-.field > input[type="range"] {
-	appearance: auto;
-}
-
 .field > input:not([type="checkbox"]):not([type="range"]),
 .field > select {
 	width: 100%;
 	color: var(--text);
 	font-family: var(--font-sans);
-	font-size: var(--text-md);
+	font-size: 16px;
 	padding: var(--space-2) var(--space-3);
 	background: var(--bg);
 	border: 1px solid var(--line);
@@ -110,6 +105,7 @@
 
 .field > input[type="range"] {
 	padding: 0;
+	appearance: auto;
 	background: transparent;
 	border: 0;
 	cursor: pointer;

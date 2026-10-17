@@ -268,7 +268,7 @@ export default function Controller() {
 			</p>
 			<h1>Virtual controller</h1>
 			<p>
-				Presets keep their names. Profils are copies you can rename. Click a face, or one stick direction, and
+				Presets keep their names. Profiles are copies you can rename. Click a face, or one stick direction, and
 				press the key you want. The center of a stick is the stick click. Esc clears that bind.
 			</p>
 
@@ -286,7 +286,7 @@ export default function Controller() {
 								</option>
 							))}
 						</optgroup>
-						<optgroup label="Profils">
+						<optgroup label="Profiles">
 							{profils.length === 0
 								? <option value="" disabled>No profile</option>
 								: profils.map((item) => (
@@ -299,12 +299,12 @@ export default function Controller() {
 				</label>
 				{!preset.builtin && (
 					<label className="field">
-						<span>Nom</span>
+						<span>Name</span>
 						<input
 							type="text"
 							maxLength={32}
 							value={preset.name}
-							placeholder="Mon profil"
+							placeholder="My profile"
 							onInput={(event) => rename((event.target as HTMLInputElement).value)}
 							onBlur={commitName}
 						/>
@@ -327,7 +327,7 @@ export default function Controller() {
 				</label>
 				<div>
 					<button type="button" className="btn" disabled={full} onClick={openCreate}>
-						Nouveau profil
+						New profile
 					</button>
 					{preset.builtin
 						? (
@@ -370,23 +370,23 @@ export default function Controller() {
 			<dialog ref={dialogRef}>
 				<form onSubmit={create}>
 					<header>
-						<h2>Nouveau profil</h2>
+						<h2>New profile</h2>
 					</header>
 					<label className="field">
-						<span>Nom</span>
+						<span>Name</span>
 						<input
 							type="text"
 							maxLength={32}
-							placeholder="Mon profil"
+							placeholder="My profile"
 							value={draftName.value}
 							onInput={(event) => draftName.value = (event.target as HTMLInputElement).value}
 						/>
 					</label>
 					<footer>
 						<button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
-							Annuler
+							Cancel
 						</button>
-						<button type="submit" className="btn btn-primary">Créer</button>
+						<button type="submit" className="btn btn-primary">Create</button>
 					</footer>
 				</form>
 			</dialog>

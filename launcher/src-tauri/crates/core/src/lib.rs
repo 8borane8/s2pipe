@@ -35,11 +35,15 @@ pub fn run_watchdog() {
 }
 
 /// Headless start for the boot service: no window and no display needed, errors go to stderr.
+/// A stack that is already up is left alone: starting again would restart it, so a second
+/// autostart entry firing at login would cut the stream the boot service just started.
 pub fn run_autostart() {
     block_on(
         async {
             match load_config()? {
-                Some(config) if config.launch_at_startup => Stack::start(config).await,
+                Some(config) if config.launch_at_startup && !Stack::is_running() => {
+                    Stack::start(config).await
+                }
                 _ => Ok(()),
             }
         },
