@@ -1154,7 +1154,7 @@ function App() {
 									<div className="field">
 										<label>
 											<span>
-												HDMI audio (Pulse/PipeWire source)
+												HDMI audio (ALSA)
 											</span>
 
 											<input
@@ -1168,7 +1168,7 @@ function App() {
 															event.currentTarget as HTMLInputElement
 														).value,
 													)}
-												placeholder="alsa_input.usb-..."
+												placeholder="hw:0,0"
 											/>
 										</label>
 									</div>

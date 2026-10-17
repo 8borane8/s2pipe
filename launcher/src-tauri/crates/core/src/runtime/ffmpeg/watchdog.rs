@@ -19,12 +19,7 @@ pub async fn run() -> Result<(), String> {
 
     // FFmpeg logs are appended across restarts; start clean so error tails match this launch.
     for name in ["ffmpeg-video", "ffmpeg-audio"] {
-        let path = log_path(name)?;
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)
-                .map_err(|e| format!("Failed to create log directory: {e}"))?;
-        }
-        std::fs::File::create(&path).map_err(|e| format!("Failed to reset {name} log: {e}"))?;
+        let _ = std::fs::write(log_path(name)?, "");
     }
 
     let video = start_video(&config).await?;

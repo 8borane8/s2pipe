@@ -43,7 +43,7 @@ fn device_path(index: &CameraIndex, name: &str) -> String {
 pub async fn list_capture_devices() -> Result<Vec<CaptureDevice>, String> {
     tokio::task::spawn_blocking(|| {
         let cameras = query(ApiBackend::Auto).map_err(|e| e.to_string())?;
-        let mut devices: Vec<CaptureDevice> = cameras
+        Ok(cameras
             .into_iter()
             .map(|info| {
                 let name = info.human_name();
@@ -52,12 +52,8 @@ pub async fn list_capture_devices() -> Result<Vec<CaptureDevice>, String> {
                     label: name,
                 }
             })
-            .collect();
-        #[cfg(target_os = "linux")]
-        devices.retain(|device| is_capture_node(&device.path));
-        let mut seen = std::collections::HashSet::new();
-        devices.retain(|device| seen.insert(device.path.clone()));
-        Ok(devices)
+            .filter(|device| is_capture_node(&device.path))
+            .collect())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -65,7 +61,7 @@ pub async fn list_capture_devices() -> Result<Vec<CaptureDevice>, String> {
 
 /// A UVC device exposes a second `/dev/videoN` for metadata (sysfs `index` > 0) that cannot
 /// capture and fails with "Inappropriate ioctl for device". Only index 0 is a capture node.
-#[cfg(target_os = "linux")]
+/// Anything that is not a Linux device node is kept.
 fn is_capture_node(path: &str) -> bool {
     let Some(node) = path.strip_prefix("/dev/") else {
         return true;
@@ -177,44 +173,84 @@ fn list_windows_audio_devices() -> Result<Vec<AudioDevice>, String> {
     }
 }
 
-/// Lists PulseAudio sources (PipeWire serves them too), which is what the bundled FFmpeg
-/// captures from. Monitors of output devices are skipped. The path is the source name.
+/// Reads ALSA capture endpoints straight from the kernel, so the launcher does
+/// not depend on alsa-utils being installed.
 #[cfg(target_os = "linux")]
 fn list_linux_audio_devices() -> Result<Vec<AudioDevice>, String> {
+    let pcm = std::fs::read_to_string("/proc/asound/pcm")
+        .map_err(|e| format!("Unable to read /proc/asound/pcm: {e}"))?;
+
+    Ok(pcm
+        .lines()
+        .filter(|line| line.contains("capture "))
+        .filter_map(|line| {
+            let mut fields = line.split(':');
+            let (card, device) = fields.next()?.trim().split_once('-')?;
+            let card: u32 = card.parse().ok()?;
+            let device: u32 = device.parse().ok()?;
+            let name = fields.next()?.trim();
+            Some(AudioDevice {
+                path: format!("hw:{card},{device}"),
+                label: format!("{name} (hw:{card},{device})"),
+            })
+        })
+        .collect())
+}
+
+/// The bundled FFmpeg has no ALSA demuxer, only PulseAudio (which PipeWire also serves), so a
+/// listed `hw:card,device` endpoint is captured through a Pulse source. Returns the source on
+/// that endpoint, asking the server to load one when it did not detect the card itself
+/// (headless session, server started without hardware detection). Any other name is already a
+/// Pulse source name and is returned unchanged.
+#[cfg(target_os = "linux")]
+pub(crate) fn pulse_source_for(device: &str) -> Result<String, String> {
+    let Some((card, dev)) = device.strip_prefix("hw:").and_then(|d| d.split_once(',')) else {
+        return Ok(device.to_string());
+    };
+
+    let sources = pactl(&["list", "sources"])?;
+    for block in sources.split("Source #").skip(1) {
+        let value = |key: &str| {
+            block
+                .lines()
+                .find_map(|line| line.trim().strip_prefix(key))
+                .map(|rest| rest.trim().trim_matches('"'))
+        };
+        if value("device.class = ") != Some("monitor")
+            && value("alsa.card = ") == Some(card)
+            && value("alsa.device = ") == Some(dev)
+        {
+            return Ok(value("Name: ").unwrap_or_default().to_string());
+        }
+    }
+
+    let name = format!("s2pipe_hw_{card}_{dev}");
+    pactl(&[
+        "load-module",
+        "module-alsa-source",
+        &format!("device={device}"),
+        &format!("source_name={name}"),
+    ])?;
+    Ok(name)
+}
+
+#[cfg(target_os = "linux")]
+fn pactl(args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new("pactl")
-        .args(["list", "sources"])
+        .args(args)
         .env("LC_ALL", "C")
+        // AppImage prepends its own libraries here, which can break system binaries.
+        .env_remove("LD_LIBRARY_PATH")
         .output()
         .map_err(|e| {
             format!("Unable to run pactl ({e}). Install pulseaudio-utils or pipewire-pulse.")
         })?;
     if !output.status.success() {
         return Err(format!(
-            "pactl list sources failed: {}",
+            "pactl {} failed: {}",
+            args.join(" "),
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
-
-    let text = String::from_utf8_lossy(&output.stdout);
-    let mut devices: Vec<AudioDevice> = Vec::new();
-    for block in text.split("Source #").skip(1) {
-        let value = |key: &str| {
-            block
-                .lines()
-                .find_map(|line| line.trim().strip_prefix(key))
-                .map(|rest| rest.trim().trim_matches('"').to_string())
-        };
-        if value("device.class = ").as_deref() == Some("monitor") {
-            continue;
-        }
-        let Some(name) = value("Name: ") else {
-            continue;
-        };
-        if devices.iter().any(|device| device.path == name) {
-            continue;
-        }
-        let label = value("Description: ").unwrap_or_else(|| name.clone());
-        devices.push(AudioDevice { path: name, label });
-    }
-    Ok(devices)
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
