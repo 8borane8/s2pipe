@@ -1,4 +1,4 @@
-﻿use nokhwa::query;
+use nokhwa::query;
 use nokhwa::utils::{ApiBackend, CameraIndex};
 use serde::{Deserialize, Serialize};
 

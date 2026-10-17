@@ -1,72 +1,122 @@
 ---
 name: frontend
 description: >-
-    Conventions front (Slick, Preact, CSS structurel, islands).
-    A utiliser des que l'on ecrit, modifie ou review du HTML, CSS, JSX/TSX,
-    pages, templates, islands, components ou styles.
+    Conventions for Slick 0.7, Preact islands, SSR-first data loading, and structural CSS.
+    Use whenever writing, changing, or reviewing HTML, CSS, JSX/TSX, pages, templates,
+    islands, components, or styles.
 ---
 
 # Front
 
-Appliquer ces regles a chaque tache front. Lire aussi [css-order.md](css-order.md) avant d'ecrire du CSS.
+Apply this skill on every front-end task. Also read:
 
-## Langue et prose
+- [slick.md](slick.md) before adding pages, templates, islands, `onrequest`, `onpost`, env, or SPA navigation
+- [css-order.md](css-order.md) before writing CSS
 
-- Tout le contenu UI, commentaires utiles, labels, titres, messages et textes visibles en francais.
-- Ne jamais utiliser le tiret cadratin (`—`). Preferer la virgule, les deux-points, les parentheses ou un tiret simple
-  `-`.
+## Project variables
 
-## Stack et dossiers
+Change this table when copying the skill to another project.
 
-Stack: Deno, `@webtools/slick-server`, Preact, CSS dans `static/styles/`.
+| Name            | This project | Controls                                                                                                         |
+| --------------- | ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `UI_LANG`       | French       | All user-visible copy: labels, titles, errors, `alt`, placeholders, `aria-*` text                                |
+| `COMMENTS_LANG` | English      | Code comments. Why only, never what                                                                              |
+| `HTML_LANG`     | `fr`         | `new Slick(..., { lang })`, the `<html lang>` attribute                                                          |
+| `SLOT`          | `div#app`    | Template injection slot. Slick requires `id="app"` in the template markup. This project uses a `div`, not `main` |
+| `DASH`          | never `—`    | UI punctuation: comma, colon, parentheses, or `-`                                                                |
 
-| Dossier          | Role                                                 |
-| ---------------- | ---------------------------------------------------- |
-| `pages/`         | Routes SSR                                           |
-| `templates/`     | Layouts                                              |
-| `islands/`       | UI interactive hydratee                              |
-| `components/`    | UI statique ou logique pure, sans hydratation propre |
-| `static/styles/` | CSS (tokens, reset, pages, templates)                |
+Write UI in `UI_LANG`. Write comments in `COMMENTS_LANG`. Do not use `DASH` in UI copy.
 
-Reutiliser `tokens.css` (variables) et `reset.css`. Ne pas reinventer couleurs, rayons, espaces ou typos deja tokens.
+## Golden rule: no client init fetch
 
-## Polices et assets
+The first paint of a page must not wait on a browser request. Auth, redirects, and data loading happen in SSR
+`onrequest`. Islands receive the slice they need as props.
 
-- Importer les polices via `@import` dans le CSS (`tokens.css` ou fichier de zone), pas via `<link>` ou `preconnect`
-  dans `head`.
-- Laisser `head: null` sauf besoin exceptionnel (meta specifique, script tiers, etc.).
+**Forbidden by default:** `useEffect` that `fetch`es the page payload, a "Loading..." shell that then hydrates data,
+reading the API only after mount.
 
-## HTML structurel
+**Allowed:** island `fetch` after a user action (toggle, save, delete, submit). Then update the DOM in place, or
+`Slick.redirect(url, { reload: true })` so `onrequest` runs again.
 
-### Slick et `#root`
+**Exception:** data that cannot exist at SSR time (device APIs, WebSocket, live cursor). Add a `COMMENTS_LANG` comment
+that says why.
 
-Le body rendu d'un template est deja injecte dans `div#root` par Slick. Inutile d'ajouter une div principale de coque
-(`div#auth-shell`, etc.) : utiliser un fragment `<>...</>` quand plusieurs racines suffisent.
+### Data flow
 
-Le slot de page est `div#app` (pas un `main`) : Slick y injecte le body de la page. Les templates portent deja `header`
-(et `nav` si besoin). Les pages injectees dans `#app` n'utilisent **pas** `main`, `header`, `footer`, `nav` : `section`
-/ `aside` / `article` / `div`. `header` / `footer` restent valides **dans un `<dialog>`**.
-
-Styler la coque via `#root` dans le CSS du template concerne.
-
-### Semantique et wrappers
-
-1. `main`, `header`, `footer`, `nav` : seulement dans le template (une fois). Pas de doublon dans la page injectee. Le
-   slot du template est `div#app`.
-2. Les pages injectent leur contenu dans `div#app` avec `section`, `aside`, `article`, puis elements semantiques ou
-   `div` / `span` si besoin.
-3. Preferer une hierarchie claire et semantique plutot que des wrappers inutiles.
-4. Eviter les conteneurs sans but precis : pas de `nav > ol` si `ol` seul suffit (choisir l'un ou l'autre), pas de `div`
-   autour d'un `h1` + `p` deja adjacents, etc.
-5. Factoriser: pas de duplication de markup; extraire un component ou une island selon le cas.
-
-Exemple template (slot Slick) :
-
-```tsx
-<div id="app">{/* contenu page */}</div>;
+```
+GET /page
+  -> template.onrequest   (shared: session, auth gate, layout data)
+  -> page.onrequest       (route data)
+  -> fail: res.redirect / res.status  (never render an empty shell)
+  -> ok: req.data = ...
+  -> template body + page body read req.data  (SSR HTML)
+  -> islands get JSON props from that data
 ```
 
-Exemple page avec aside :
+1. Put checks and fetches in `onrequest` (template if every page of that shell needs it, page if only that route needs
+   it).
+2. Short-circuit with `return res.redirect(...)` or an error response when the check fails.
+3. Assign the result to `req.data`. Type it: `satisfies Template<{ items: Item[] }>` and `satisfies Page<typeof app>`.
+4. `body: (req) => ...` (and `title` / `head` / `favicon` if they depend on data) reads `req.data`.
+5. Pass only what the island needs: `<Row item={item} />`. The island does not refetch that payload.
+
+`req.data` is filled by middleware, typed through the template/page, and available in `title`, `head`, `body`,
+`favicon`, later `onrequest`, and `onpost`. See [slick.md](slick.md).
+
+Do not import a template from an island (that pulls server `onrequest` into the client bundle).
+
+## Stack and folders
+
+Deno, `@webtools/slick-server` 0.7, optional `@webtools/slick-client` 0.4 (`client: true`), Preact 10, CSS in
+`static/styles/`.
+
+| Folder           | Role                                          |
+| ---------------- | --------------------------------------------- |
+| `pages/`         | One route per file, `export default` a `Page` |
+| `templates/`     | Shells, `export default` a `Template`         |
+| `islands/`       | Interactive Preact, hydrated on the client    |
+| `components/`    | Static UI or pure logic, no own hydration     |
+| `static/styles/` | CSS (tokens, reset, templates, pages)         |
+
+Reuse `tokens.css` and `reset.css`. Do not invent colors, radii, spacing, or type already in tokens.
+
+`template` is the imported object, not a name string:
+
+```tsx
+import app from "../templates/app.tsx";
+
+export default {
+	url: "/items",
+	template: app,
+	body: (req) => <section id="items">{req.data.items.length}</section>,
+} satisfies Page<typeof app>;
+```
+
+Omit optional fields (`onrequest`, `onpost`, `head`, empty `styles` / `scripts`) instead of `null` or `[]`.
+
+Fonts: `@import` in CSS (`tokens.css` or a zone file). No `<link>` or `preconnect` for fonts in `head`. Omit `head`
+unless you need a specific meta or third-party script.
+
+## HTML
+
+Slick injects the template body into `div#root`. Do not wrap the template in an extra shell (`div#auth-shell`). A
+template may return a fragment `<>...</>` when several roots are enough. An island should still prefer a single element
+root (see Islands).
+
+The page slot is `SLOT` (`div#app`), written in the template markup itself, not returned by a component. Slick injects
+the page `body` as its children. Style the shell via `#root` in that template's CSS.
+
+`header` / `footer` / `nav` / `main` belong in the template, once. Pages injected into `#app` use `section` / `aside` /
+`article` / `div`. `header` / `footer` are allowed **inside a `<dialog>`**.
+
+1. Clear semantic hierarchy. No wrappers with no job.
+2. Do not duplicate landmark tags in the page. The slot is `div#app`, not `main`.
+3. No `nav > ol` if `ol` is enough. No `div` around an already adjacent `h1` + `p`.
+4. Extract a component or an island instead of copying markup.
+
+```tsx
+<div id="app">{/* page body */}</div>;
+```
 
 ```tsx
 <section id="register">
@@ -75,165 +125,100 @@ Exemple page avec aside :
 </section>;
 ```
 
-Exemple page simple :
+## CSS
 
-```tsx
-<section id="login">
-	<article>...</article>
-</section>;
-```
+Read [css-order.md](css-order.md). Flex by default. Grid only when it is clearly better. No `float`, no absolute
+positioning as layout, unless there is a real need.
 
-## CSS structurel
-
-### Selecteurs
-
-- **Conteneur de page ou zone** : un `id` sur la coque unique (`#register`, `#billing`).
-- **Balise unique dans le template** : pas besoin d'`id` si l'element n'existe qu'une fois (`aside`, `nav`, `header`
-  dans ce template). Utiliser le selecteur de type directement (`aside > h1`, `nav > a`).
-- **Motif reutilisable** : `class` sur le conteneur racine du motif (`.field`, `.btn`, `.brand`).
-- **Enfants d'un conteneur identifie** : eviter les `id` enfants. Preferer le markup semantique (`h1`, `p`, `form`,
-  `fieldset`) et des selecteurs structurels.
-- A l'interieur d'un conteneur, **pas** de classes partout. Styler via cascade et selecteurs structurels:
+- **Page or zone shell:** one `id` (`#register`, `#billing`).
+- **Unique tag in a template:** type selector (`aside > h1`, `nav > a`). No extra `id`.
+- **Reusable pattern:** `class` on the pattern root (`.field`, `.btn`, `.brand`).
+- **Inside an identified shell:** no child `id`s. Semantic tags + structural selectors. No class on every child.
 
 ```css
 #register > article > form > fieldset > label > span {
 	...
 }
-aside > h1 {
-	...
-}
-aside > ol > li[aria-current="step"] > p {
-	...
-}
-.field > input {
-	...
-}
 ```
 
-- Factoriser les styles partages en classes courtes; eviter les utilitaires type Tailwind.
-- Un fichier CSS par page ou zone, declare dans `styles` du template/page.
+One CSS file per page or zone, listed in `styles` of the template or page. Order in `styles` matters: later file wins at
+equal specificity. To hide a zone, beat the later `display` with a child of the shell (`#page > #panel`), not a bare
+`#panel`.
 
-### Fichiers et specificite
-
-L'ordre dans `styles` compte: a specificite egale, le fichier charge **plus tard** gagne.
-
-Pour masquer une zone, le selecteur doit battre le `display` du fichier de zone. Preferer un enfant de la coque:
-
-```css
-#page > #panel {
-	display: none;
-}
-```
-
-pas `#panel { display: none }` si `#panel { display: flex }` est declare plus loin.
-
-### Layout
-
-- Preferer **flexbox** par defaut.
-- Utiliser **grid** seulement quand c'est clairement mieux (grilles 2D, alignements complexes).
-- Eviter `float`, et les proprietes layout exotiques ou fragiles (`position` absolu partout, hacks, etc.) sauf besoin
-  reel.
-
-### Ordre des proprietes
-
-Toujours le meme ordre de groupes. Mieux vaut declarer explicitement (ex. `flex-direction: row`) que d'omettre. Details
-et liste complete: [css-order.md](css-order.md).
-
-```css
-.box {
-	width: 100%;
-	height: auto;
-	max-width: 28rem;
-
-	color: var(--color-text);
-	font-size: var(--text-md);
-	font-weight: 400;
-	font-family: var(--font-sans);
-	line-height: 1.5;
-
-	text-align: left;
-	text-transform: none;
-
-	display: flex;
-	flex-direction: row;
-	justify-content: flex-start;
-	align-items: center;
-	flex-wrap: nowrap;
-	gap: var(--space-3);
-
-	margin: 0;
-	padding: var(--space-4);
-
-	overflow: visible;
-	background: var(--color-bg-elevated);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-}
-```
+Short shared classes for patterns. No Tailwind-style utilities.
 
 ## Islands vs components
 
-| Besoin                                                          | Emplacement   |
-| --------------------------------------------------------------- | ------------- |
-| Element interactif (etat, events, formulaires client, signals)  | `islands/`    |
-| Markup / UI non hydratee, ou logique UI sans hydratation propre | `components/` |
+| Need                                               | Where         |
+| -------------------------------------------------- | ------------- |
+| Interactive (state, events, client forms, signals) | `islands/`    |
+| Non-hydrated markup or UI logic                    | `components/` |
 
-Regles strictes:
+Islands are small. A switch, a row action, a dialog trigger. The list, headings, and stats stay SSR.
 
-1. Une island = racine d'interactivite. Export default Preact depuis `islands/`.
-2. Les components peuvent etre dynamiques (props, rendu conditionnel) mais **doivent etre importes depuis une island**
-   (ou depuis une page/template s'ils restent 100% statiques SSR).
-3. **Interdit**: importer une island depuis une autre island.
-4. Pages et templates importent les islands; les islands importent des components, jamais l'inverse pour l'hydratation.
-5. Minimiser le JS client: ne pas hydrater ce qui peut rester HTML statique.
+1. `export default` a Preact function. Prefer **one root element**. A fragment of elements is allowed by Slick; `null`,
+   text-only, or mixed text+elements at the root is not.
+2. Props are JSON: strings, numbers, booleans, arrays, objects. No functions, no classes, no `children`.
+3. Pages and templates import islands. Islands import components. Do not import a template from an island.
+4. Nested island imports are compiled into the parent bundle (only the outer island hydrates). Avoid unless it is
+   clearly simpler.
+5. Do not hydrate a block that only displays SSR data.
 
 ```txt
 page / template
-  -> island (interactive)
-       -> component (sous-UI, factorisee)
-  -> component (statique SSR ok)
+  -> island (interactive slice)
+       -> component
+  -> component (static SSR)
 ```
+
+## Client libraries
+
+Slick 0.7 compiles `static/` scripts and islands with esbuild.
+
+- `client: true` bundles `@webtools/slick-client` from `deno.json`. Do not add it to `sharedLibs`.
+- `preact`, `preact/hooks`, `preact/jsx-runtime`, `preact-root-fragment`, and `@preact/signals` (if imported in
+  `deno.json`) are already shared. Do not add them to `sharedLibs`.
+- Any other package used in an island: specifier in `deno.json` `imports` **and** in `sharedLibs` (if more than one
+  island uses it, or it is large). No `esm.sh` URLs.
+- Compile-time env: `config.env`, then bare identifiers (`API_URL`). No `Deno.env.get` in pages, templates, islands, or
+  `static/` scripts. Declare them with `declare global` (for example `env.ts`) for TypeScript.
+- Dev: pass `--dev`. `hotReload` only in that case. Changing `config.env`, `port`, or `sharedLibs` still needs a
+  restart.
 
 ## Navigation
 
-Interdit: `location.reload()`, `location.assign()`, `location.href =`.
+Forbidden: `location.reload()`, `location.assign()`, `location.href =`.
 
-- Changer de page: `Slick.redirect(url)` (`@webtools/slick-client`).
-- Rester sur la page apres une mutation: mettre a jour le DOM et les signals (conserver media, scroll, etat local).
-- Lien interne: `<a href>` suffit (Slick intercepte).
+- Internal link: `<a href>`. Slick intercepts when `client: true`.
+- Programmatic navigation: `Slick.redirect(url)` from `@webtools/slick-client`.
+- Refresh SSR data on the same URL: `Slick.redirect(url, { reload: true, replace: true })`.
+- Stay on the page after a mutation: update the DOM / signals (keep media, scroll, local state).
+- `data-slick-ignore` on a link leaves it to the browser. `data-slick-reload` refetches the template.
+
+POST forms are a full page load unless you `preventDefault` and `fetch`, or you handle them in `onpost`. GET forms
+become query navigation.
 
 ## UX
 
-- Liste / catalogue: la liste est le contenu principal. Creation et edition dans un `<dialog>`, pas un formulaire
-  toujours visible a cote.
-- Champs de saisie vides: `placeholder` (exemples courts).
-- "Reinitialiser" applique tout de suite. Pas besoin d'une seconde confirmation du type Valider.
-- Un filtre ou etat actif doit se voir (compteur, pastille, `aria-pressed`).
-- Ne pas garder de controle UI sans usage reel.
+- List / catalogue is the main content. Create and edit in a `<dialog>`, not a form always visible beside the list.
+- Empty inputs: short `placeholder`s.
+- Reset applies immediately. No second "Confirm" after Reset.
+- An active filter or state must be visible (count, badge, `aria-pressed`).
+- No control without a real use. Responsive: an intermediate breakpoint, not only desktop vs tiny phone.
 
-## Factorisation
+## Factoring
 
-- Extraire des qu'un motif se repete (markup, CSS, logique).
-- Preferer un component/island clair plutot que copier-coller. Deux ecrans identiques = une island parametree, pas deux.
-- CSS: classes partagees pour les motifs; ids pour les coques de page.
-- Props et API internes courtes; pas d'abstractions prematurees inutiles.
-- Reutiliser tokens et styles existants avant d'en ajouter.
+Extract as soon as a pattern repeats. Two identical screens: one parameterized island, not two. Short props. Reuse
+tokens before adding new ones.
 
-## Checklist avant de livrer
+## Checklist
 
-- [ ] Textes FR, aucun tiret cadratin
-- [ ] Polices via `@import` CSS, pas de `<link>` font dans `head`
-- [ ] Pas de div coque inutile dans le template (`#root` suffit)
-- [ ] `div#app` dans le template (slot Slick), pas de `main` sur le slot
-- [ ] Pas de `main` / `header` / `footer` / `nav` dans la page injectee (deja dans le template)
-- [ ] Balises uniques sans `id` superflu; pas d'`id` sur les enfants d'une coque
-- [ ] Markup semantique (`h1`, `p`, `ol`) plutot que `id` descriptifs
-- [ ] Pas de wrappers inutiles (`nav > ol`, `div` autour de `h1` + `p`, etc.)
-- [ ] Ids sur conteneurs de page, classes sur motifs reutilisables
-- [ ] CSS structurel dans les sous-arbres (pas de classes sur chaque enfant)
-- [ ] Proprietes CSS dans l'ordre defini, flex explicite
-- [ ] Interactif = island; pas d'import island -> island
-- [ ] Factorise, tokens reutilises, peu de JS client
-- [ ] Pas de reload hard; mutation sur place ou `Slick.redirect`
-- [ ] Placeholders; reinitialiser applique sans etape de plus
-- [ ] Responsive: palier intermediaire
+- [ ] UI in `UI_LANG`, comments in `COMMENTS_LANG`, no `DASH`
+- [ ] No client init fetch; `onrequest` -> `req.data` -> body -> island props
+- [ ] Fonts via CSS `@import`, no font `<link>` in `head`
+- [ ] `SLOT` in the template markup, no extra shell, no landmarks in the injected page
+- [ ] Ids on shells, classes on patterns, structural CSS, property order
+- [ ] Small islands, JSON props, one root, no template import from an island
+- [ ] `config.env` globals, `sharedLibs` only for extra packages
+- [ ] No hard reload; `Slick.redirect` or in-place update
+- [ ] Placeholders, visible active state, intermediate breakpoint

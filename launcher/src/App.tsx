@@ -31,6 +31,7 @@ interface WakeScanResult {
 interface AppConfig {
 	nodePort: string;
 	nodeBaseUrl: string;
+	nodePassword: string;
 	clientPort: string;
 	exposure: string;
 
@@ -65,6 +66,7 @@ interface AppConfig {
 const DEFAULT_CONFIG: AppConfig = {
 	nodePort: "5050",
 	nodeBaseUrl: "http://localhost:5050",
+	nodePassword: "",
 	clientPort: "5000",
 	exposure: "local",
 
@@ -694,7 +696,7 @@ function App() {
 									"Filled with this PC's LAN address so other devices on the network can reach it."}
 
 								{config.exposure === "wan" &&
-									"Filled with this PC's public IP. There is no authentication: put your own security in front of it."}
+									"Filled with this PC's public IP. Set a node password below so browsers must authenticate."}
 							</small>
 						</label>
 
@@ -721,6 +723,27 @@ function App() {
 								</small>
 							</label>
 						)}
+
+						<label>
+							<span>Node password</span>
+
+							<input
+								id="nodePassword"
+								type="password"
+								value={config.nodePassword}
+								onInput={(event) =>
+									updateConfig(
+										"nodePassword",
+										(event.currentTarget as HTMLInputElement).value,
+									)}
+								placeholder="Leave empty to skip authentication"
+								autocomplete="new-password"
+							/>
+
+							<small>
+								Browsers enter this on the connect page. It is sent as Authorization on every node request.
+							</small>
+						</label>
 
 						{advancedMode && (
 							<div className="fields-grid advanced">
@@ -1377,7 +1400,7 @@ function App() {
 									</strong>
 
 									<small>
-										On login, start s2pipe in the background and close the launcher.
+										Start s2pipe in the background, without a window (at boot on Linux, on login on Windows).
 									</small>
 								</div>
 							</label>

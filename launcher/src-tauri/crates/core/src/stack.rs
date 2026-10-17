@@ -34,15 +34,24 @@ impl StackPids {
         self.pids().any(pid_alive)
     }
 
-    fn kill_all(&self) {
-        if let Some(pid) = self.ffmpeg_watchdog {
-            kill_pid_force(pid);
-        }
+    /// The watchdog is always killed outright so it cannot restart FFmpeg while we stop.
+    fn kill_all(&self, force: bool) {
         for pid in self.pids() {
-            if Some(pid) != self.ffmpeg_watchdog {
+            if force || Some(pid) == self.ffmpeg_watchdog {
+                kill_pid_force(pid);
+            } else {
                 kill_pid(pid);
             }
         }
+    }
+
+    /// Whether everything exited within `timeout`.
+    fn wait_stopped(&self, timeout: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        while self.is_running() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        !self.is_running()
     }
 }
 
@@ -55,10 +64,11 @@ impl Stack {
 
     pub fn stop() -> Result<(), String> {
         if let Some(pids) = load_pids() {
-            pids.kill_all();
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-            while pids.is_running() && std::time::Instant::now() < deadline {
-                std::thread::sleep(std::time::Duration::from_millis(50));
+            pids.kill_all(false);
+            // A process that ignores SIGTERM would keep its port busy for the next start.
+            if !pids.wait_stopped(std::time::Duration::from_secs(2)) {
+                pids.kill_all(true);
+                pids.wait_stopped(std::time::Duration::from_secs(2));
             }
             // COM handles can linger a tick after the process exit code flips.
             std::thread::sleep(std::time::Duration::from_millis(150));
@@ -109,7 +119,7 @@ impl Stack {
         .await;
 
         if let Err(error) = started {
-            pids.kill_all();
+            pids.kill_all(true);
             let _ = std::fs::remove_file(pids_path()?);
             return Err(error);
         }

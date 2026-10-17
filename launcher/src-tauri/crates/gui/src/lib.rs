@@ -1,5 +1,7 @@
 mod commands;
 
+#[cfg(target_os = "linux")]
+use s2pipe_core::run_autostart;
 use s2pipe_core::{has_arg, install_launcher, load_config, run_watchdog, set_autostart, Stack};
 use tauri::{Emitter, Manager};
 
@@ -14,6 +16,13 @@ fn show_window(app: &tauri::AppHandle) {
 pub fn run() {
     if has_arg("--watchdog") {
         run_watchdog();
+        return;
+    }
+
+    // The boot service has no display, which GTK needs even for a hidden window.
+    #[cfg(target_os = "linux")]
+    if has_arg("--autostart") {
+        run_autostart();
         return;
     }
 

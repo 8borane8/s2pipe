@@ -1,7 +1,5 @@
 import type { Template } from "@webtools/slick-server";
 
-import { nodeUrl } from "../client.ts";
-
 export default {
 	name: "app",
 	favicon: "/favicon.svg",
@@ -15,8 +13,8 @@ export default {
 	scripts: [],
 
 	head: null,
-	body: (req) => (
-		<div id="root" data-node-url={nodeUrl(req.cookies.nodeUrl) || ""}>
+	body: (
+		<div id="root">
 			<div id="app"></div>
 		</div>
 	),

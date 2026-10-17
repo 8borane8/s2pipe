@@ -109,6 +109,9 @@ pub fn spawn_ffmpeg(mut command: Command, label: &str, log: &Path) -> Result<Ffm
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
+    // On Unix FFmpeg stays in the watchdog's process group, so killing that group takes it along.
+    // A group of its own would outlive the watchdog and keep the capture device busy.
+    #[cfg(windows)]
     detach(&mut command);
     let mut child = spawn(&mut command, label)?;
     let Some(stderr) = child.stderr.take() else {

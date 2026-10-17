@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct AppConfig {
     pub node_port: String,
     pub node_base_url: String,
+    #[serde(default)]
+    pub node_password: String,
     pub client_port: String,
     pub exposure: String,
 
@@ -37,6 +39,7 @@ impl Default for AppConfig {
         Self {
             node_port: "5050".into(),
             node_base_url: "http://localhost:5050".into(),
+            node_password: String::new(),
             client_port: "5000".into(),
             exposure: "local".into(),
             media_ice_ip: "127.0.0.1".into(),

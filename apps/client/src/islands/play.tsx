@@ -15,6 +15,7 @@ import {
 	type StreamStats,
 	type WhepHandle,
 } from "../utils/whep.ts";
+import { nodePassword } from "../utils/authorization.ts";
 import { holdPage } from "../utils/page-session.ts";
 import { loadPlayPrefs, savePlayPrefs } from "../utils/prefs.ts";
 import {
@@ -39,6 +40,8 @@ function wsUrl(nodeUrl: string): string {
 	url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
 	url.pathname = "/socket";
 	url.search = "";
+	const password = nodePassword();
+	if (password) url.searchParams.set("authorization", password);
 	return url.href;
 }
 
@@ -178,7 +181,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		}, 4200);
 	}
 
-	// Gestion de la connexion WHeP (Vidéo + Audio)
+	// WHEP connection (video + audio)
 	useEffect(() => {
 		const video = videoRef.current;
 		if (!video) return;
@@ -238,7 +241,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 					audioHandle.audio.volume = volume.value;
 				}
 			} catch {
-				// L'audio peut échouer sans bloquer la vidéo
+				// Audio can fail without blocking video
 			}
 		};
 
@@ -272,7 +275,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		});
 	}, []);
 
-	// Gestion WebSocket (Statut et Commandes)
+	// WebSocket (status and commands)
 	useEffect(() => {
 		let socket: WebSocket | null = null;
 		let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -318,7 +321,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 						send(socket, { op: "pong" });
 					}
 				} catch {
-					// Ignorer les messages invalides
+					// Ignore invalid messages
 				}
 			});
 
@@ -345,7 +348,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		});
 	}, [nodeUrl]);
 
-	// Gestion des manettes (Gamepads)
+	// Gamepads
 	useEffect(() => {
 		const tracker = createInputTracker();
 		inputRef.current = tracker;
@@ -389,7 +392,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		});
 	}, [virtualPrefs.value.enabled]);
 
-	// Boucle d'envoi des inputs de la manette
+	// Gamepad input send loop
 	useEffect(() => {
 		let frame = 0;
 		const lastBySeat = new Map<number, PadState>();
@@ -480,7 +483,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		});
 	}, []);
 
-	// Raccourci Clavier (Échap pour les paramètres)
+	// Keyboard shortcut (Escape opens settings)
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.code !== "Escape" || event.repeat) return;
@@ -500,7 +503,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		audio.volume = volume.value;
 	}, [muted.value, volume.value, live.value]);
 
-	// Récupération des stats du flux
+	// Stream stats
 	useEffect(() => {
 		if (!showStats.value) {
 			stats.value = null;
@@ -517,7 +520,7 @@ export default function Play({ nodeUrl, nodeLocked }: Props) {
 		return holdPage(() => clearInterval(timer));
 	}, [showStats.value]);
 
-	// Gestion Plein Écran
+	// Fullscreen
 	useEffect(() => {
 		const onFs = () => {
 			const on = document.fullscreenElement === stageRef.current;

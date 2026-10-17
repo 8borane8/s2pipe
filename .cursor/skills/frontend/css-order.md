@@ -1,8 +1,7 @@
-# Ordre des proprietes CSS
+# CSS property order
 
-Toujours grouper dans cet ordre. Separateurs visuels optionnels (ligne vide entre groupes). Declarer explicitement les
-valeurs utiles meme quand elles sont les defauts (`flex-direction: row`, `flex-wrap: nowrap`, etc.) des qu'on ouvre un
-contexte flex/grid.
+Always group in this order. Blank lines between groups are optional. When you open a flex or grid context, declare the
+useful values even if they are defaults (`flex-direction: row`, `flex-wrap: nowrap`, and so on).
 
 ## 1. Box / dimensions
 
@@ -17,7 +16,7 @@ aspect-ratio
 box-sizing
 ```
 
-## 2. Typographie / couleur de texte
+## 2. Typography / text color
 
 ```
 color
@@ -31,7 +30,7 @@ letter-spacing
 word-spacing
 ```
 
-## 3. Texte
+## 3. Text
 
 ```
 text-align
@@ -47,7 +46,7 @@ vertical-align
 list-style
 ```
 
-## 4. Affichage et layout (flex ou grid)
+## 4. Display and layout (flex or grid)
 
 ```
 display
@@ -83,13 +82,13 @@ place-content
 place-self
 ```
 
-Regles:
+Rules:
 
-- Flex par defaut. Si `display: flex`, declarer au minimum: `flex-direction`, `justify-content`, `align-items`,
-  `flex-wrap`, `gap` quand pertinents.
-- Grid seulement si mieux qu'un flex. Si `display: grid`, declarer les tracks / gaps explicitement.
+- Flex by default. If `display: flex`, declare at least: `flex-direction`, `justify-content`, `align-items`,
+  `flex-wrap`, and `gap` when they matter.
+- Grid only when it is clearly better than flex. If `display: grid`, declare tracks and gaps explicitly.
 
-## 5. Espacements
+## 5. Spacing
 
 ```
 margin
@@ -108,7 +107,7 @@ padding-bottom
 padding-left
 ```
 
-## 6. Positionnement et debordement
+## 6. Positioning and overflow
 
 ```
 position
@@ -124,7 +123,7 @@ overflow-y
 isolation
 ```
 
-## 7. Fond et bordures
+## 7. Background and borders
 
 ```
 background
@@ -150,12 +149,12 @@ opacity
 visibility
 ```
 
-## 8. Interactivite et effets
+## 8. Interaction and effects
 
 ```
 cursor
 pointer-events
-user-events
+user-select
 resize
 appearance
 filter
@@ -180,7 +179,7 @@ object-fit
 object-position
 ```
 
-## Exemple complet
+## Full example
 
 ```css
 .card {
@@ -220,9 +219,9 @@ object-position
 }
 ```
 
-## A eviter
+## Avoid
 
-- `float` (sauf cas legacy isole)
-- Enchainements `position: absolute` pour faire un layout qui serait simple en flex/grid
-- Classes utilitaires eparpillees sur chaque enfant
-- Proprietes redondantes hors ordre (garder le meme arrangement partout)
+- `float` (except an isolated legacy case)
+- Chains of `position: absolute` for a layout that flex or grid would handle
+- Utility classes sprinkled on every child
+- Properties out of this order (keep the same arrangement everywhere)

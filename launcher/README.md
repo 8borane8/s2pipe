@@ -7,17 +7,17 @@ whole stack detached.
 
 Download from [Releases](https://github.com/8borane8/s2pipe/releases):
 
-| File                                 | What it is                         |
-| ------------------------------------ | ---------------------------------- |
-| `s2pipe-<version>.exe`               | Portable GUI (Windows, no install) |
-| `s2pipe-<version>.msi`               | GUI installer (Windows)            |
-| `s2pipe-<version>-x86_64.AppImage`   | Portable GUI (Linux x86_64)        |
-| `s2pipe-<version>-aarch64.AppImage`  | Portable GUI (Linux aarch64)       |
-| `s2pipe-<version>-x86_64.deb`        | GUI installer (Debian / Ubuntu x86_64) |
-| `s2pipe-<version>-aarch64.deb`       | GUI installer (Debian / Ubuntu aarch64) |
-| `s2pipe-cli-<version>.exe`           | CLI (Windows)                      |
-| `s2pipe-cli-<version>-x86_64`        | CLI (Linux x86_64)                 |
-| `s2pipe-cli-<version>-aarch64`       | CLI (Linux aarch64)                |
+| File                                | What it is                              |
+| ----------------------------------- | --------------------------------------- |
+| `s2pipe-<version>.exe`              | Portable GUI (Windows, no install)      |
+| `s2pipe-<version>.msi`              | GUI installer (Windows)                 |
+| `s2pipe-<version>-x86_64.AppImage`  | Portable GUI (Linux x86_64)             |
+| `s2pipe-<version>-aarch64.AppImage` | Portable GUI (Linux aarch64)            |
+| `s2pipe-<version>-x86_64.deb`       | GUI installer (Debian / Ubuntu x86_64)  |
+| `s2pipe-<version>-aarch64.deb`      | GUI installer (Debian / Ubuntu aarch64) |
+| `s2pipe-cli-<version>.exe`          | CLI (Windows)                           |
+| `s2pipe-cli-<version>-x86_64`       | CLI (Linux x86_64)                      |
+| `s2pipe-cli-<version>-aarch64`      | CLI (Linux aarch64)                     |
 
 Nothing else is required. The Deno apps (`apps/`, `shared/`, `deno.json`) are baked into the binary at compile time with
 `include_dir`, so a bare `.exe` carries the full stack.
@@ -64,8 +64,10 @@ are included in the error message.
 
 The watchdog is the same GUI or CLI binary, copied to `~/.s2pipe/launcher` on launch. It runs `--watchdog`, starts video
 and audio, reads `-progress pipe:2` in memory (stderr, not a file), and every second checks that `out_time_us` still
-grows. Ten seconds without growth, kill and restart. Autostart always points at that same file: the Windows Run key, or
-`~/.config/autostart/s2pipe.desktop` on Linux.
+grows. Ten seconds without growth, kill and restart. Autostart always points at that same file, with `--autostart`: the Windows Run key
+(on login), or on Linux a systemd user service (`~/.config/systemd/user/s2pipe.service`) with lingering enabled
+(`loginctl enable-linger`), so it starts at machine boot, without SSH, remote desktop or any login, and without a
+display. If lingering is refused, run `sudo loginctl enable-linger $USER` once.
 
 ## Encoders
 
@@ -105,8 +107,9 @@ Everything lives in `~/.s2pipe`:
 | `8889` | MediaMTX WHEP                |
 | `8189` | WebRTC ICE (UDP)             |
 
-Only `8189` needs to be reachable by players; the rest follows from the exposure choice in the GUI. There is no
-authentication anywhere.
+Only `8189` needs to be reachable by players; the rest follows from the exposure choice in the GUI. A node password in
+the GUI (or `--node-password`) makes the node require that value in the `Authorization` header on every route. Leave it
+empty for no authentication.
 
 ## Development
 
@@ -134,4 +137,5 @@ loaded into the server (`module-alsa-source`) if the server did not detect the c
 `runtime/ffmpeg` is split by concern: `input.rs` builds the capture arguments, `encoder.rs` the codec arguments,
 `mod.rs` runs the attempt list and spawns FFmpeg, and `watchdog.rs` supervises `out_time_us` and restarts on freeze.
 
-Releases are cut by pushing a `v*` tag; `.github/workflows/launcher.yml` builds both binaries on Windows and on Linux x86_64 and aarch64.
+Releases are cut by pushing a `v*` tag; `.github/workflows/launcher.yml` builds both binaries on Windows and on Linux
+x86_64 and aarch64.

@@ -1,5 +1,7 @@
 use clap::{Args, Parser, Subcommand};
-use s2pipe_core::{has_arg, install_launcher, load_config, run_watchdog, AppConfig, Stack};
+use s2pipe_core::{
+    has_arg, install_launcher, load_config, run_autostart, run_watchdog, AppConfig, Stack,
+};
 
 #[derive(Parser)]
 #[command(
@@ -26,6 +28,8 @@ struct StartArgs {
     node_port: Option<String>,
     #[arg(long)]
     node_base_url: Option<String>,
+    #[arg(long)]
+    node_password: Option<String>,
     #[arg(long)]
     client_port: Option<String>,
     #[arg(long)]
@@ -88,6 +92,7 @@ impl StartArgs {
             config.node_port = port;
         }
         overlay(&mut config.node_base_url, self.node_base_url);
+        overlay(&mut config.node_password, self.node_password);
         overlay(&mut config.client_port, self.client_port);
         overlay(&mut config.media_ice_ip, self.media_ice_ip);
         overlay(&mut config.media_ice_port, self.media_ice_port);
@@ -121,6 +126,10 @@ fn main() {
         run_watchdog();
         return;
     }
+    if has_arg("--autostart") {
+        run_autostart();
+        return;
+    }
 
     let _ = install_launcher();
     if let Err(error) = run() {
@@ -131,13 +140,6 @@ fn main() {
 
 #[tokio::main]
 async fn run() -> Result<(), String> {
-    if has_arg("--autostart") {
-        return match load_config()? {
-            Some(config) if config.launch_at_startup => Stack::start(config).await,
-            _ => Ok(()),
-        };
-    }
-
     match Cli::parse().command {
         Command::Start(args) => {
             let loaded = load_config()?;

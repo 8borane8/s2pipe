@@ -8,6 +8,7 @@ async function forward(req: HttpRequest, res: HttpResponse): Promise<Response> {
 
 	const headers = new Headers(req.raw.headers);
 	headers.delete("host");
+	headers.delete("authorization");
 
 	try {
 		const upstream = await fetch(url, {

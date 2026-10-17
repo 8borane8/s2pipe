@@ -52,7 +52,9 @@ pub async fn public_ip() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn start_s2pipe(config: AppConfig) -> Result<(), String> {
-    save_app_config(config.clone()).await?;
+    s2pipe_core::save_config(&config)?;
+    // Autostart problems are reported when the setting is saved, they must not block a start.
+    let _ = set_autostart(config.launch_at_startup);
     Stack::start(config.clone()).await?;
     let _ = open::that_detached(format!("http://127.0.0.1:{}", config.client_port));
     Ok(())

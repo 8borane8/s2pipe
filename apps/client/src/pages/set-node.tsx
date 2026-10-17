@@ -1,7 +1,7 @@
 import type { Page } from "@webtools/slick-server";
 
 import SetNode from "../islands/set-node.tsx";
-import { nodeUrlLocked } from "../client.ts";
+import { nodeUrl, nodeUrlLocked } from "../client.ts";
 
 export default {
 	url: "/set-node",
@@ -13,14 +13,16 @@ export default {
 	scripts: [],
 
 	head: null,
-	body: (
+	body: (req) => (
 		<section id="set-node">
-			<SetNode />
+			<SetNode
+				locked={nodeUrlLocked()}
+				initialUrl={nodeUrl(req.cookies.nodeUrl) || "http://localhost:5050"}
+				initialPassword={req.cookies.nodePassword?.trim() || ""}
+			/>
 		</section>
 	),
 
 	onpost: null,
-	onrequest: (_req, res) => {
-		if (nodeUrlLocked()) return res.redirect("/");
-	},
+	onrequest: null,
 } satisfies Page;

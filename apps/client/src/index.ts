@@ -5,7 +5,7 @@ const app = new Slick(import.meta.dirname!, {
 	lang: "en",
 	client: true,
 	hotReload: Deno.args.includes("--dev"),
-	sharedLibs: ["lucide-preact", "@webtools/expressapi"],
+	sharedLibs: ["lucide-preact"],
 });
 
 await app.start();

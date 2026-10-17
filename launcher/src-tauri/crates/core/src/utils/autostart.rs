@@ -1,4 +1,4 @@
-use std::path::Path;
+﻿use std::path::Path;
 
 use super::bin::install_launcher;
 
@@ -57,32 +57,54 @@ fn reg(args: &[&str]) -> Result<(), String> {
     }
 }
 
-/// XDG autostart: GNOME, KDE, XFCE, Cinnamon, etc. read `~/.config/autostart`.
+/// Linux starts at machine boot, before anyone logs in over SSH, remote desktop or console.
+/// XDG autostart only fires on a graphical login. A systemd user service does it once lingering
+/// lets the user manager run without a session. The unit is enabled by its symlink, so no
+/// session bus is needed.
 #[cfg(not(windows))]
-fn desktop_file() -> Option<std::path::PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("autostart/s2pipe.desktop"))
+const UNIT: &str = "s2pipe.service";
+
+#[cfg(not(windows))]
+fn unit_dir() -> Result<std::path::PathBuf, String> {
+    dirs::config_dir()
+        .map(|dir| dir.join("systemd/user"))
+        .ok_or_else(|| "Unable to find user config directory".to_string())
 }
 
 #[cfg(not(windows))]
 fn enable(path: &Path) -> Result<(), String> {
-    let file = desktop_file().ok_or_else(|| "Unable to find user config directory".to_string())?;
-    if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir)
-            .map_err(|e| format!("Failed to create autostart directory: {e}"))?;
-    }
+    disable();
+    let dir = unit_dir()?;
+    let wants = dir.join("default.target.wants");
+    std::fs::create_dir_all(&wants)
+        .map_err(|e| format!("Failed to create {}: {e}", wants.display()))?;
+
+    let unit = dir.join(UNIT);
     std::fs::write(
-        &file,
+        &unit,
         format!(
-            "[Desktop Entry]\nType=Application\nName=s2pipe\nExec=\"{}\" --autostart\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+            "[Unit]\nDescription=s2pipe\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=\"{}\" --autostart\n\n[Install]\nWantedBy=default.target\n",
             path.display()
         ),
     )
-    .map_err(|e| format!("Failed to enable autostart: {e}"))
+    .map_err(|e| format!("Failed to write {}: {e}", unit.display()))?;
+    std::os::unix::fs::symlink(&unit, wants.join(UNIT))
+        .map_err(|e| format!("Failed to enable autostart: {e}"))?;
+
+    match std::process::Command::new("loginctl").arg("enable-linger").status() {
+        Ok(status) if status.success() => Ok(()),
+        _ => Err("Autostart will only run after the next login. To start at boot, run: sudo loginctl enable-linger $USER".into()),
+    }
 }
 
 #[cfg(not(windows))]
 fn disable() {
-    if let Some(file) = desktop_file() {
-        let _ = std::fs::remove_file(file);
+    if let Ok(dir) = unit_dir() {
+        let _ = std::fs::remove_file(dir.join("default.target.wants").join(UNIT));
+        let _ = std::fs::remove_file(dir.join(UNIT));
+    }
+    // Earlier versions used an XDG entry, which would restart the stack at every login.
+    if let Some(dir) = dirs::config_dir() {
+        let _ = std::fs::remove_file(dir.join("autostart/s2pipe.desktop"));
     }
 }

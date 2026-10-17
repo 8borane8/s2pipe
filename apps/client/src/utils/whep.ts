@@ -1,3 +1,5 @@
+import { authorization, nodePassword } from "./authorization.ts";
+
 export type WhepHandle = {
 	pc: RTCPeerConnection;
 	close: () => Promise<void>;
@@ -48,7 +50,7 @@ async function postWhep(
 
 	const response = await fetch(`${nodeUrl}${route}`, {
 		method: "POST",
-		headers: { "content-type": "application/sdp" },
+		headers: { "content-type": "application/sdp", ...authorization(nodePassword()) },
 		body: pc.localDescription?.sdp ?? offer.sdp,
 	});
 
@@ -68,7 +70,7 @@ function closeWhep(pc: RTCPeerConnection, nodeUrl: string, location: string | nu
 		pc.close();
 		if (!location) return;
 		const resource = new URL(location, `${nodeUrl}/`).href;
-		await fetch(resource, { method: "DELETE" }).catch(() => {});
+		await fetch(resource, { method: "DELETE", headers: authorization(nodePassword()) }).catch(() => {});
 	};
 }
 

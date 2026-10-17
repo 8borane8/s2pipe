@@ -18,14 +18,31 @@ pub fn has_arg(flag: &str) -> bool {
     std::env::args().any(|arg| arg == flag)
 }
 
-/// Used by the GUI, which has no Tokio main of its own.
-pub fn run_watchdog() {
+fn block_on(task: impl std::future::Future<Output = Result<(), String>>, label: &str) {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .expect("watchdog runtime");
-    if let Err(error) = runtime.block_on(runtime::ffmpeg::run_watchdog()) {
-        eprintln!("FFmpeg watchdog error: {error}");
+        .expect("runtime");
+    if let Err(error) = runtime.block_on(task) {
+        eprintln!("{label} error: {error}");
         std::process::exit(1);
     }
+}
+
+/// Used by the GUI, which has no Tokio main of its own.
+pub fn run_watchdog() {
+    block_on(runtime::ffmpeg::run_watchdog(), "FFmpeg watchdog");
+}
+
+/// Headless start for the boot service: no window and no display needed, errors go to stderr.
+pub fn run_autostart() {
+    block_on(
+        async {
+            match load_config()? {
+                Some(config) if config.launch_at_startup => Stack::start(config).await,
+                _ => Ok(()),
+            }
+        },
+        "Autostart",
+    );
 }

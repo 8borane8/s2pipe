@@ -55,6 +55,7 @@ pub fn start_node(deno: &Path, workspace: &Path, config: &AppConfig) -> Result<u
             .join("index.ts"),
         [
             ("NODE_PORT", config.node_port.as_str()),
+            ("NODE_PASSWORD", config.node_password.as_str()),
             ("MEDIA_HOST", "127.0.0.1"),
             ("CAPTURE_SOURCE", config.capture_source.as_str()),
             ("PICO_SERIAL", config.pico_serial.as_str()),

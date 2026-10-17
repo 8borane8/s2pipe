@@ -288,7 +288,7 @@ export default function Controller() {
 						</optgroup>
 						<optgroup label="Profils">
 							{profils.length === 0
-								? <option value="" disabled>Aucun profil</option>
+								? <option value="" disabled>No profile</option>
 								: profils.map((item) => (
 									<option key={item.id} value={item.id}>
 										{item.name}

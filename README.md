@@ -96,7 +96,7 @@ Open the launcher.
 
 Open [http://localhost:5000](http://localhost:5000). On another LAN device, use the node address you set.
 
-Optional: **Launch at startup** starts s2pipe in the background on login (no window). Closing the launcher does not stop
+Optional: **Launch at startup** starts s2pipe in the background (no window): at machine boot on Linux, on login on Windows. Closing the launcher does not stop
 the stack; use Stop or `s2pipe stop`.
 
 No window: use the **CLI**. Flags overlay `~/.s2pipe/config.json` for that run (defaults if there is no saved file).
